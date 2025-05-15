@@ -1,0 +1,47 @@
+{
+  "name": "@steipete/claude-code-mcp",
+  "version": "1.12.0",
+  "description": "Simple MCP server for Claude Code one-shot execution",
+  "author": "Peter Steinberger",
+  "license": "MIT",
+  "main": "dist/server.js",
+  "bin": {
+    "claude-code-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.26.0",
+    "@modelcontextprotocol/sdk": "^1.11.2",
+    "@modelcontextprotocol/server-brave-search": "^0.6.2",
+    "async-retry": "^1.3.3",
+    "server-perplexity-ask": "^0.1.3",
+    "zod": "^3.24.4"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@types/async-retry": "^1.4.9",
+    "@types/node": "^22.15.17",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/steipete/claude-code-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "ai",
+    "llm",
+    "tools"
+  ],
+  "bugs": {
+    "url": "https://github.com/steipete/claude-code-mcp/issues"
+  },
+  "homepage": "https://github.com/steipete/claude-code-mcp#readme"
+}
