@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } from '@modelcontextprotocol/sdk/types.js';
 import { spawn } from 'node:child_process';
 import { existsSync, watch } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve as pathResolve } from 'node:path';
 import * as path from 'path';
@@ -246,6 +247,24 @@ class ClaudeCodeServer {
                     },
                 },
                 {
+                    name: 'convert_task_markdown',
+                    description: 'Converts markdown task files into Claude Code MCP-compatible JSON format. Returns an array of tasks that can be executed using the claude_code tool.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            markdownPath: {
+                                type: 'string',
+                                description: 'Path to the markdown task file to convert.',
+                            },
+                            outputPath: {
+                                type: 'string',
+                                description: 'Optional path where to save the JSON output. If not provided, returns the JSON directly.',
+                            },
+                        },
+                        required: ['markdownPath'],
+                    },
+                },
+                {
                     name: 'claude_code',
                     description: `Claude Code Agent: Your versatile multi-modal assistant for code, file, Git, and terminal operations via Claude CLI. Use \`workFolder\` for contextual execution.
 
@@ -377,8 +396,99 @@ class ClaudeCodeServer {
                 debugLog(`[Debug] Health check request ${requestId} completed`);
                 return { content: [{ type: 'text', text: JSON.stringify(healthInfo, null, 2) }] };
             }
-            // Handle tools - we support both 'health' and 'claude_code'
-            if (toolName !== 'claude_code' && toolName !== 'health') {
+            // Handle convert_task_markdown tool
+            if (toolName === 'convert_task_markdown') {
+                const toolArguments = args.params.arguments;
+                // Extract markdownPath (required)
+                let markdownPath;
+                if (toolArguments &&
+                    typeof toolArguments === 'object' &&
+                    'markdownPath' in toolArguments &&
+                    typeof toolArguments.markdownPath === 'string') {
+                    markdownPath = toolArguments.markdownPath;
+                }
+                else {
+                    throw new McpError(ErrorCode.InvalidParams, 'Missing or invalid required parameter: markdownPath for convert_task_markdown tool');
+                }
+                // Extract outputPath (optional)
+                let outputPath;
+                if (toolArguments.outputPath && typeof toolArguments.outputPath === 'string') {
+                    outputPath = toolArguments.outputPath;
+                }
+                debugLog(`[Debug] Converting markdown task file: ${markdownPath}`);
+                let stderr = '';
+                try {
+                    // Prepare command to run task_converter.py
+                    const pythonPath = 'python3';
+                    const converterPath = pathResolve(__dirname, '../docs/task_converter.py');
+                    // Use --json-output flag to get JSON to stdout
+                    const args = ['--json-output', markdownPath];
+                    const result = await spawnAsync(pythonPath, [converterPath, ...args], {
+                        cwd: homedir(),
+                        timeout: 30000 // 30 seconds timeout
+                    });
+                    const stdout = result.stdout;
+                    stderr = result.stderr;
+                    // Extract progress messages and actual errors
+                    const stderrLines = stderr.split('\n');
+                    const progressMessages = stderrLines.filter(line => line.includes('[Progress]'));
+                    const errorMessages = stderrLines.filter(line => !line.includes('[Progress]') && line.trim());
+                    // Log progress messages
+                    progressMessages.forEach(msg => {
+                        console.error(msg); // Send to client
+                        debugLog(msg);
+                    });
+                    if (errorMessages.length > 0) {
+                        stderr = errorMessages.join('\n');
+                        debugLog(`[Debug] Task converter stderr: ${stderr}`);
+                    }
+                    // Check if there was an error from the converter
+                    if (stderr && stderr.includes('Markdown format validation failed')) {
+                        // Return validation error as a structured response
+                        const validationError = {
+                            status: 'error',
+                            error: 'Markdown format validation failed',
+                            details: stderr,
+                            helpUrl: 'https://github.com/grahama1970/claude-code-mcp/blob/main/README.md#markdown-task-file-format'
+                        };
+                        this.activeRequests.delete(requestId);
+                        return { content: [{ type: 'text', text: JSON.stringify(validationError, null, 2) }] };
+                    }
+                    // Parse the JSON output
+                    const tasks = JSON.parse(stdout);
+                    // If outputPath is provided, also save to file
+                    if (outputPath) {
+                        await fs.writeFile(outputPath, JSON.stringify(tasks, null, 2));
+                        debugLog(`[Debug] Saved converted tasks to: ${outputPath}`);
+                    }
+                    // Return the converted tasks
+                    const response = {
+                        status: 'success',
+                        tasksCount: tasks.length,
+                        outputPath: outputPath || 'none',
+                        tasks: tasks
+                    };
+                    this.activeRequests.delete(requestId);
+                    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+                }
+                catch (error) {
+                    this.activeRequests.delete(requestId);
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    // Check if this is a JSON parsing error (indicating validation failure)
+                    if (errorMessage.includes('JSON') && stderr) {
+                        const validationError = {
+                            status: 'error',
+                            error: 'Task conversion failed',
+                            details: stderr || errorMessage,
+                            helpUrl: 'https://github.com/grahama1970/claude-code-mcp/blob/main/README.md#markdown-task-file-format'
+                        };
+                        return { content: [{ type: 'text', text: JSON.stringify(validationError, null, 2) }] };
+                    }
+                    throw new McpError(ErrorCode.InternalError, `Failed to convert markdown tasks: ${errorMessage}`);
+                }
+            }
+            // Handle tools - we support 'health', 'claude_code', and 'convert_task_markdown'
+            if (toolName !== 'claude_code' && toolName !== 'health' && toolName !== 'convert_task_markdown') {
                 // ErrorCode.ToolNotFound should be ErrorCode.MethodNotFound as per SDK for tools
                 throw new McpError(ErrorCode.MethodNotFound, `Tool ${toolName} not found`);
             }

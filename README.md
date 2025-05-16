@@ -23,6 +23,7 @@ This MCP server provides powerful tools that can be used by LLMs to interact wit
 
 - **Enhanced Reliability:** Robust error handling, automatic retries, graceful shutdown, and request tracking
 - **Task Orchestration:** Complex workflows can be broken down into specialized subtasks
+- **Task Automation:** Convert human-readable markdown task lists into executable MCP commands automatically
 - **Performance Optimization:** Improved execution with configuration caching and resource efficiency
 - **Better Monitoring:** Health check API, detailed error reporting, and comprehensive logging
 - **Developer Experience:** Hot reloading of configuration, flexible environment controls, and simplified API
@@ -136,7 +137,7 @@ Create this file if it doesn't exist.
 
 ## 🛠️ Tools Provided
 
-This server exposes two primary tools:
+This server exposes three primary tools:
 
 ### `claude_code` 💬
 
@@ -191,6 +192,25 @@ Returns health status, version information, and current configuration of the Cla
     "uptime": "240 minutes"
   },
   "timestamp": "2025-05-15T18:30:00.000Z"
+}
+```
+
+### `convert_task_markdown` 📋
+
+Converts markdown task files into Claude Code MCP-compatible JSON format.
+
+**Arguments:**
+- `markdownPath` (string, required): Path to the markdown task file to convert.
+- `outputPath` (string, optional): Path where to save the JSON output. If not provided, returns the JSON directly.
+
+**Example Request:**
+```json
+{
+  "toolName": "claude_code:convert_task_markdown",
+  "arguments": {
+    "markdownPath": "/home/user/tasks/validation.md",
+    "outputPath": "/home/user/tasks/validation.json"
+  }
 }
 ```
 
@@ -249,6 +269,156 @@ Returns health status, version information, and current configuration of the Cla
   }
 }
 ```
+
+## 🔄 Task Converter
+
+The MCP server includes a powerful task converter tool that automatically transforms human-readable markdown task lists into fully executable MCP commands. This intelligent converter bridges the gap between how humans think about tasks and how machines execute them.
+
+### Key Features
+
+- **Automatic Path Resolution:** Converts generic instructions like "change directory to project" into exact executable commands with full paths
+- **Smart Command Translation:** Transforms English instructions into precise terminal commands (e.g., "activate the virtual environment" → `source .venv/bin/activate`)
+- **MCP Protocol Compliance:** Ensures all output is 100% compatible with the Model Context Protocol
+- **No Ambiguity:** All generated commands use exact paths and executable syntax - no placeholders or generic references
+- **Format Validation:** Enforces proper markdown structure and provides helpful error messages for incorrect formatting
+- **Real-time Progress Updates:** Provides live progress updates during conversion showing which tasks are being processed
+
+### Convert Markdown Tasks to MCP Commands
+
+The `convert_task_markdown` tool processes structured markdown files and generates MCP-compatible JSON:
+
+**Request Format:**
+```json
+{
+  "tool": "convert_task_markdown",
+  "arguments": {
+    "markdownPath": "/path/to/tasks.md",
+    "outputPath": "/path/to/output.json" // optional
+  }
+}
+```
+
+**Response Format:**
+```json
+{
+  "tasksCount": 5,
+  "outputPath": "/path/to/output.json",
+  "tasks": [
+    {
+      "tool": "claude_code",
+      "arguments": {
+        "command": "cd /project && source .venv/bin/activate\n\nTASK TYPE: Validation...",
+        "dangerously_skip_permissions": true,
+        "timeout_ms": 300000
+      }
+    }
+    // ... more tasks
+  ]
+}
+```
+
+### Markdown Task File Format
+
+Task markdown files should follow this structure:
+
+```markdown
+# Task 001: Task Title
+
+## Objective
+Clear description of what needs to be accomplished.
+
+## Requirements
+1. [ ] First requirement
+2. [ ] Second requirement
+
+## Tasks
+
+### Module or Component Name
+- [ ] Validate `path/to/file.py`
+   - [ ] Step 1
+   - [ ] Step 2
+   - [ ] Step 3
+```
+
+The converter will:
+1. Parse the markdown structure
+2. Extract task metadata and requirements
+3. Generate detailed prompts for each validation task
+4. Include proper working directory setup
+5. Add verification and completion summaries
+
+### Example Usage
+
+1. **Create a task file** (`tasks/api_validation.md`):
+```markdown
+# Task 001: API Endpoint Validation
+
+## Objective
+Validate all API endpoints work with real database connections.
+
+## Requirements
+1. [ ] All endpoints must use real database
+2. [ ] No mock data in validation
+
+## Core API Tasks
+- [ ] Validate `api/users.py`
+   - [ ] Change directory to project and activate .venv
+   - [ ] Test user creation endpoint
+   - [ ] Test user retrieval endpoint
+   - [ ] Verify JSON responses
+```
+
+2. **Convert to MCP tasks**:
+```json
+{
+  "tool": "convert_task_markdown",
+  "arguments": {
+    "markdownPath": "/project/tasks/api_validation.md"
+  }
+}
+```
+
+3. **The converter shows real-time progress**:
+   ```
+   [Progress] Loading task file...
+   [Progress] Validating markdown structure...
+   [Progress] Converting 27 validation tasks...
+   [Progress] Task 1/27: Converting core/constants.py
+   [Progress] Task 2/27: Converting core/arango_setup.py
+   ...
+   [Progress] Conversion complete!
+   ```
+
+4. **The converter transforms generic instructions into exact commands**:
+   - "Change directory to project and activate .venv" becomes:
+     ```bash
+     cd /home/user/project && source .venv/bin/activate
+     ```
+   - All paths are resolved to absolute paths
+   - All commands are fully executable with no ambiguity
+
+5. **Execute the converted tasks**:
+The returned tasks contain exact, executable commands and can be executed sequentially using the `claude_code` tool.
+
+### Format Validation and Error Handling
+
+The task converter enforces a specific markdown structure to ensure consistent and reliable task conversion. If your markdown file is incorrectly formatted, the converter provides helpful error messages:
+
+**Example error response:**
+```json
+{
+  "status": "error",
+  "error": "Markdown format validation failed",
+  "details": "Markdown format validation failed:\n  - Missing required title. Format: '# Task NNN: Title'\n  - Missing or empty 'Requirements' section. Format: '## Requirements\\n1. [ ] Requirement'\n  - No validation tasks found. Format: '- [ ] Validate `module.py`' with indented steps\n\nRequired markdown format:\n# Task NNN: Title\n## Objective\nClear description\n## Requirements\n1. [ ] First requirement\n## Task Section\n- [ ] Validate `file.py`\n   - [ ] Step 1\n   - [ ] Step 2",
+  "helpUrl": "https://github.com/grahama1970/claude-code-mcp/blob/main/README.md#markdown-task-file-format"
+}
+```
+
+The validation ensures:
+1. Required sections are present (Title, Objective, Requirements)
+2. Tasks use proper checkbox format
+3. Each task has indented steps
+4. Requirements use checkbox format for consistency
 
 ## 🦚 Task Orchestration Patterns
 

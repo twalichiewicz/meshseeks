@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2025-05-16
+
+### Added
+- Added `convert_task_markdown` tool for converting markdown task files to MCP-compatible JSON format
+- Added task converter script (`docs/task_converter.py`) that transforms human-readable task lists into executable MCP commands
+- Added support for `--json-output` flag in task converter for direct JSON output to stdout
+- Added comprehensive documentation and examples for task conversion in README.md
+- Added validation for MCP format compliance in converted tasks
+- Added robust error handling and validation for markdown format with helpful error messages
+- Added structured error responses that guide users to fix formatting issues
+- Added real-time progress updates during task conversion showing which tasks are being processed
+
+### Changed
+- The task converter intelligently transforms generic English instructions (like "Change directory to project and activate .venv") into exact executable commands (`cd /exact/path && source .venv/bin/activate`)
+- All converted tasks include exact paths and executable commands with no ambiguity
+- Error responses now include specific guidance on required markdown format and link to documentation
+
 ## [1.12.0] - 2025-05-15
 
 ### Added
