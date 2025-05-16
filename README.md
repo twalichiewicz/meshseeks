@@ -41,30 +41,90 @@ Plus all the standard Claude Code benefits:
 
 ## 💾 Installation & Usage
 
-### 🚀 Via NPX (Recommended)
+You can install and use this MCP server in three different ways:
 
-The recommended way to use this server is by installing it by using `npx`.
+### 🚀 Method 1: Via GitHub URL (Recommended)
+
+The most flexible method is to install directly from GitHub using `npx`. This always fetches the latest version from the repository.
 
 Add the following to your `.mcp.json` file:
 
 ```json
-"claude-code-mcp": {
-  "command": "npx",
-  "args": [
-    "-y",
-    "@steipete/claude-code-mcp@latest"
-  ]
+{
+  "mcpServers": {
+    "claude-code-mcp-enhanced": {
+      "command": "npx",
+      "args": [
+        "github:grahama1970/claude-code-mcp-enhanced"
+      ],
+      "env": {
+        "MCP_CLAUDE_DEBUG": "false",
+        "MCP_HEARTBEAT_INTERVAL_MS": "15000",
+        "MCP_EXECUTION_TIMEOUT_MS": "1800000"
+      }
+    }
+  }
 }
 ```
 
-### 🔧 Manual Setup
+### 📦 Method 2: Via npm Package
 
-To set up manually:
+If the package is published to npm, you can install it using the npm package name:
 
-1. Clone the repository
-2. Install dependencies with `npm install`
-3. Build the server with `npm run build` or use the provided `start.sh` script
-4. Configure your `.mcp.json` file to use the local server
+```json
+{
+  "mcpServers": {
+    "claude-code-mcp-enhanced": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@grahama1970/claude-code-mcp-enhanced@latest"
+      ],
+      "env": {
+        "MCP_CLAUDE_DEBUG": "false",
+        "MCP_HEARTBEAT_INTERVAL_MS": "15000",
+        "MCP_EXECUTION_TIMEOUT_MS": "1800000"
+      }
+    }
+  }
+}
+```
+
+### 🔧 Method 3: Local Installation
+
+For development or testing purposes, you can run the server from a local installation:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/grahama1970/claude-code-mcp-enhanced.git
+   cd claude-code-mcp-enhanced
+   ```
+
+2. Install dependencies and build:
+   ```bash
+   npm install
+   npm run build
+   ```
+
+3. Configure your `.mcp.json` file to use the local server:
+
+```json
+{
+  "mcpServers": {
+    "claude-code-mcp-enhanced": {
+      "command": "node",
+      "args": [
+        "/path/to/claude-code-mcp-enhanced/dist/server.js"
+      ],
+      "env": {
+        "MCP_CLAUDE_DEBUG": "false",
+        "MCP_HEARTBEAT_INTERVAL_MS": "15000",
+        "MCP_EXECUTION_TIMEOUT_MS": "1800000"
+      }
+    }
+  }
+}
+```
 
 ## 🔑 Important First-Time Setup: Accepting Permissions
 
@@ -410,7 +470,7 @@ The task converter enforces a specific markdown structure to ensure consistent a
   "status": "error",
   "error": "Markdown format validation failed",
   "details": "Markdown format validation failed:\n  - Missing required title. Format: '# Task NNN: Title'\n  - Missing or empty 'Requirements' section. Format: '## Requirements\\n1. [ ] Requirement'\n  - No validation tasks found. Format: '- [ ] Validate `module.py`' with indented steps\n\nRequired markdown format:\n# Task NNN: Title\n## Objective\nClear description\n## Requirements\n1. [ ] First requirement\n## Task Section\n- [ ] Validate `file.py`\n   - [ ] Step 1\n   - [ ] Step 2",
-  "helpUrl": "https://github.com/grahama1970/claude-code-mcp/blob/main/README.md#markdown-task-file-format"
+  "helpUrl": "https://github.com/grahama1970/claude-code-mcp-enhanced/blob/main/README.md#markdown-task-file-format"
 }
 ```
 
@@ -713,8 +773,9 @@ This MCP server supports integration with specialized modes through a `.roomodes
 ### How to Use Roo Modes
 
 1. **Enable Roo Mode Support:**
-   - Set the environment variable `MCP_USE_ROOMODES=true`
+   - Set the environment variable `MCP_USE_ROOMODES=true` in your MCP configuration
    - Create a `.roomodes` file in the root directory of your MCP server
+   - Optionally enable hot-reloading with `MCP_WATCH_ROOMODES=true` to automatically reload the configuration when the file changes
 
 2. **Configure Your Modes:**
    - The `.roomodes` file should contain a JSON object with a `customModes` array
@@ -744,6 +805,42 @@ This MCP server supports integration with specialized modes through a `.roomodes
      ]
    }
    ```
+
+5. **Environment Configuration Example:**
+   ```json
+   {
+     "mcpServers": {
+       "claude-code-mcp-enhanced": {
+         "command": "npx",
+         "args": ["github:grahama1970/claude-code-mcp-enhanced"],
+         "env": {
+           "MCP_USE_ROOMODES": "true",
+           "MCP_WATCH_ROOMODES": "true",
+           "MCP_CLAUDE_DEBUG": "false"
+         }
+       }
+     }
+   }
+   ```
+
+6. **Making Requests with Modes:**
+   ```json
+   {
+     "toolName": "claude_code:claude_code",
+     "arguments": {
+       "prompt": "Your work folder is /path/to/project\n\nCreate unit tests for the user authentication module.",
+       "workFolder": "/path/to/project",
+       "mode": "coder"
+     }
+   }
+   ```
+
+### Key Features of Roo Modes:
+
+- **Specialized Behaviors**: Different modes can have different system prompts and model configurations
+- **Hot Reloading**: When `MCP_WATCH_ROOMODES=true`, the server automatically reloads the configuration when the `.roomodes` file changes
+- **Performance**: The server caches the roomodes configuration for better performance
+- **Fallback**: If a mode isn't found or roomodes are disabled, the server continues with default behavior
 
 ## 🛠️ Enhanced Reliability Features
 
@@ -895,7 +992,7 @@ If you want to develop or contribute to this server, or run it from a cloned rep
 
 Contributions are welcome! Please refer to the [Local Installation & Development Setup Guide](./docs/local_install.md) for details on setting up your environment.
 
-Submit issues and pull requests to the [GitHub repository](https://github.com/steipete/claude-code-mcp).
+Submit issues and pull requests to the [GitHub repository](https://github.com/grahama1970/claude-code-mcp-enhanced).
 
 ## ⚖️ License
 
@@ -906,7 +1003,7 @@ MIT
 If you encounter any issues or have questions about using the Claude Code MCP server, please:
 
 1. Check the Troubleshooting section above
-2. Submit an issue on the [GitHub repository](https://github.com/steipete/claude-code-mcp)
+2. Submit an issue on the [GitHub repository](https://github.com/grahama1970/claude-code-mcp-enhanced)
 3. Join the discussion in the repository discussions section
 
 We appreciate your feedback and contributions to making this tool better!
