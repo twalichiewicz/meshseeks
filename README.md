@@ -1,5 +1,7 @@
 # 🤖 Claude Code MCP Server
 
+> **Want to get started quickly? Check out our [QUICKSTART.md](QUICKSTART.md) guide!**
+
 > This project is a fork of [steipete/claude-code-mcp](https://github.com/steipete/claude-code-mcp) with enhanced orchestration capabilities, reliability improvements, and additional documentation.
 
 An enhanced Model Context Protocol (MCP) server that allows running Claude Code in one-shot mode with permissions bypassed automatically. This server includes advanced task orchestration capabilities, robust error handling, and a "boomerang pattern" for breaking complex tasks into manageable subtasks.
