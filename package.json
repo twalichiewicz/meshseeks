@@ -1,12 +1,12 @@
 {
-  "name": "@steipete/claude-code-mcp",
+  "name": "@grahama1970/claude-code-mcp-enhanced",
   "version": "1.13.0",
-  "description": "Simple MCP server for Claude Code one-shot execution",
-  "author": "Peter Steinberger",
+  "description": "Enhanced MCP server for Claude Code with task orchestration and converter - Fork of @steipete/claude-code-mcp",
+  "author": "Graham A",
   "license": "MIT",
   "main": "dist/server.js",
   "bin": {
-    "claude-code-mcp": "dist/server.js"
+    "claude-code-mcp-enhanced": "dist/server.js"
   },
   "scripts": {
     "build": "tsc",
@@ -30,7 +30,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/steipete/claude-code-mcp.git"
+    "url": "git+https://github.com/grahama1970/claude-code-mcp-enhanced.git"
   },
   "keywords": [
     "mcp",
@@ -41,7 +41,7 @@
     "tools"
   ],
   "bugs": {
-    "url": "https://github.com/steipete/claude-code-mcp/issues"
+    "url": "https://github.com/grahama1970/claude-code-mcp-enhanced/issues"
   },
-  "homepage": "https://github.com/steipete/claude-code-mcp#readme"
+  "homepage": "https://github.com/grahama1970/claude-code-mcp-enhanced#readme"
 }
