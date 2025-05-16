@@ -336,6 +336,17 @@ Converts markdown task files into Claude Code MCP-compatible JSON format.
 
 The MCP server includes a powerful task converter tool that automatically transforms human-readable markdown task lists into fully executable MCP commands. This intelligent converter bridges the gap between how humans think about tasks and how machines execute them.
 
+### Complete Workflow
+
+1. **User adds the MCP** to their configuration file
+2. **User prompts Claude**: "Use convert_task_markdown to execute my tasks.md file"
+3. **The MCP automatically**:
+   - Loads the markdown file
+   - Validates the format (returns errors if sections are missing)
+   - Converts human-readable tasks into exact executable commands
+   - Returns JSON that Claude Code can execute sequentially
+4. **Claude receives the JSON** and can execute each task using the `claude_code` tool
+
 ### Key Features
 
 - **Automatic Path Resolution:** Converts generic instructions like "change directory to project" into exact executable commands with full paths
@@ -460,7 +471,51 @@ Validate all API endpoints work with real database connections.
    - All commands are fully executable with no ambiguity
 
 5. **Execute the converted tasks**:
-The returned tasks contain exact, executable commands and can be executed sequentially using the `claude_code` tool.
+   The returned tasks contain exact, executable commands and can be executed sequentially using the `claude_code` tool.
+
+### Complete Example: From Markdown to Execution
+
+**Step 1: User creates a markdown task file** (`project_tasks.md`):
+```markdown
+# Task 001: Setup Development Environment
+
+## Objective
+Initialize the development environment with all dependencies.
+
+## Requirements
+1. [ ] Python 3.11+ installed
+2. [ ] Virtual environment created
+
+## Tasks
+- [ ] Validate `setup.py`
+   - [ ] Change to project directory
+   - [ ] Create virtual environment
+   - [ ] Install dependencies
+```
+
+**Step 2: User prompts Claude**:
+```
+Use convert_task_markdown to process /home/user/project_tasks.md
+```
+
+**Step 3: MCP converts and validates**:
+- If format is correct: Returns executable JSON
+- If format is wrong: Returns error with guidance
+
+**Step 4: Result (if successful)**:
+```json
+[
+  {
+    "tool": "claude_code",
+    "arguments": {
+      "prompt": "cd /home/user/project && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt",
+      "workFolder": "/home/user/project"
+    }
+  }
+]
+```
+
+**Step 5: Claude can execute each task sequentially**
 
 ### Format Validation and Error Handling
 

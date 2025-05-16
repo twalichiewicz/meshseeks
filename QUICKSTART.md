@@ -58,12 +58,20 @@ Check server status:
 ```
 
 ### 3. convert_task_markdown
-Convert markdown task lists to executable MCP commands:
+**Automatically converts human-readable markdown task lists into MCP-compliant JSON commands that Claude Code executes sequentially!**
+
+This powerful tool transforms your TODO lists into executable code operations:
 ```json
 {
   "markdownPath": "/path/to/tasks.md"
 }
 ```
+
+**What it does:**
+- Takes a markdown file with human-readable tasks (like "Create user authentication module")
+- Converts them to exact, executable commands (like `cd /project && python create_auth.py`)
+- Outputs MCP-compliant JSON that Claude Code can run step-by-step
+- No more manual command translation - just write what you want done!
 
 ## 📝 Basic Examples
 
@@ -77,10 +85,40 @@ Use claude_code to create index.html with a basic HTML5 template
 Use claude_code to commit all changes with message "Initial commit"
 ```
 
-### Convert a task list
+### Convert a task list to executable commands
 ```
 Use convert_task_markdown to convert my tasks.md file to MCP commands
 ```
+
+**Example: Your markdown file says:**
+```markdown
+- [ ] Create user authentication module
+- [ ] Add login endpoint
+- [ ] Write unit tests
+```
+
+**The tool automatically converts to:**
+```json
+[
+  {
+    "tool": "claude_code",
+    "arguments": {
+      "prompt": "cd /project && create auth_module.py...",
+      "workFolder": "/project"
+    }
+  },
+  {
+    "tool": "claude_code",
+    "arguments": {
+      "prompt": "cd /project && add login endpoint to api/routes.py...",
+      "workFolder": "/project"
+    }
+  },
+  // ... more tasks
+]
+```
+
+**Claude Code then executes each task sequentially!** 🚀
 
 ## 🔧 Common Issues
 
