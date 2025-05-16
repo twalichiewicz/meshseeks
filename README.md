@@ -338,6 +338,36 @@ The MCP server includes a powerful task converter tool that automatically transf
 
 ### Complete Workflow
 
+```mermaid
+graph TD
+    A[👤 User] -->|1. Create tasks.md| B[📝 Multi-Task Markdown]
+    A -->|2. Prompt Claude| C[🤖 Claude Desktop]
+    C -->|"Use convert_task_markdown"| D[🔄 Task Converter MCP]
+    D -->|Validate Format| E{Format Valid?}
+    E -->|❌ No| F[📑 Error + Fix Instructions]
+    F -->|Return to User| A
+    E -->|✅ Yes| G[📋 MCP Task List]
+    G -->|Execute Task 1| H1[⚡ Claude Task #1]
+    H1 -->|✅ Complete| I1[Next Task]
+    I1 -->|Execute Task 2| H2[⚡ Claude Task #2]
+    H2 -->|✅ Complete| I2[Next Task]
+    I2 -->|Execute Task 3| H3[⚡ Claude Task #3]
+    H3 -->|✅ Complete| I3[... More Tasks ...]
+    I3 -->|Execute Task N| HN[⚡ Claude Task #N]
+    HN -->|✅ Complete| IN[🎉 All Tasks Completed!]
+    
+    style A fill:#4A90E2,stroke:#fff,stroke-width:2px,color:#fff
+    style C fill:#7C4DFF,stroke:#fff,stroke-width:2px,color:#fff
+    style D fill:#00BCD4,stroke:#fff,stroke-width:2px,color:#fff
+    style F fill:#FF5252,stroke:#fff,stroke-width:2px,color:#fff
+    style G fill:#4CAF50,stroke:#fff,stroke-width:2px,color:#fff
+    style H1 fill:#FFC107,stroke:#fff,stroke-width:2px,color:#fff
+    style H2 fill:#FFC107,stroke:#fff,stroke-width:2px,color:#fff
+    style H3 fill:#FFC107,stroke:#fff,stroke-width:2px,color:#fff
+    style HN fill:#FFC107,stroke:#fff,stroke-width:2px,color:#fff
+    style IN fill:#4CAF50,stroke:#fff,stroke-width:2px,color:#fff
+```
+
 1. **User adds the MCP** to their configuration file
 2. **User prompts Claude**: "Use convert_task_markdown to execute my tasks.md file"
 3. **The MCP automatically**:

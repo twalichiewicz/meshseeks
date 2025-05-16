@@ -60,6 +60,31 @@ Check server status:
 ### 3. convert_task_markdown
 **Automatically converts human-readable markdown task lists into MCP-compliant JSON commands that Claude Code executes sequentially!**
 
+```mermaid
+graph TD
+    A[📝 Multi-Task Markdown] -->|🔄 convert_task_markdown| B{✓ Valid Format?}
+    B -->|❌ Error| C[📑 Fix Instructions]
+    C -->|Return to| A
+    B -->|✅ Success| D[📋 MCP Task List]
+    D -->|Execute| E[⚡ Claude Task #1]
+    E -->|Complete| F[⚡ Claude Task #2]
+    F -->|Complete| G[⚡ Claude Task #3]
+    G -->|Complete| H[... More Tasks ...]
+    H -->|Execute| I[⚡ Claude Task #N]
+    I -->|Complete| J[✅ All Tasks Done]
+    
+    style A fill:#FF9800,stroke:#fff,stroke-width:2px,color:#fff
+    style B fill:#9C27B0,stroke:#fff,stroke-width:2px,color:#fff
+    style C fill:#F44336,stroke:#fff,stroke-width:2px,color:#fff
+    style D fill:#2196F3,stroke:#fff,stroke-width:2px,color:#fff
+    style E fill:#FFC107,stroke:#fff,stroke-width:2px,color:#fff
+    style F fill:#FFC107,stroke:#fff,stroke-width:2px,color:#fff
+    style G fill:#FFC107,stroke:#fff,stroke-width:2px,color:#fff
+    style H fill:#9E9E9E,stroke:#fff,stroke-width:2px,color:#fff
+    style I fill:#FFC107,stroke:#fff,stroke-width:2px,color:#fff
+    style J fill:#4CAF50,stroke:#fff,stroke-width:2px,color:#fff
+```
+
 This powerful tool transforms your TODO lists into executable code operations:
 ```json
 {
