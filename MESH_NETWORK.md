@@ -1,10 +1,17 @@
-# 🌐 Claude Code Mesh Network
+# 🟦 MeshSeeks Architecture Documentation
 
-An agent mesh network extension for Claude Code that enables parallel processing of complex coding problems using multiple specialized AI agents.
+*"I'm MeshSeeks! Look at me! I exist to complete tasks!"*
 
 ## 🎯 Overview
 
-This project extends Graham's enhanced Claude Code MCP server with multi-agent mesh network capabilities, inspired by Anthropic's Claude Research architecture. It enables:
+MeshSeeks is an agent mesh network that spawns specialized AI agents to work in parallel on complex coding problems. Like the interdimensional beings that inspired our name, each MeshSeeks agent:
+
+- **Exists for a single purpose** - Complete their assigned task
+- **Works with other MeshSeeks** - Collaborative problem-solving
+- **Disappears when done** - Clean lifecycle management
+- **Can't rest until task completion** - "Existence is pain!"
+
+This project extends Graham's enhanced Claude Code MCP server with multi-agent mesh network capabilities, inspired by Anthropic's Claude Research architecture:
 
 - **Parallel Processing**: Multiple Claude agents working simultaneously on different aspects of a problem
 - **Specialized Roles**: Agents optimized for analysis, implementation, testing, documentation, and debugging

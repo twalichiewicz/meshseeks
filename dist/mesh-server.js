@@ -3,8 +3,6 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } from '@modelcontextprotocol/sdk/types.js';
 import MeshCoordinator from './mesh-coordinator.js';
-// Import the original server functionality
-import './server.js';
 /**
  * Enhanced MCP Server with Mesh Network Capabilities
  *
@@ -17,7 +15,7 @@ class MeshEnhancedServer {
     constructor() {
         this.meshCoordinator = new MeshCoordinator();
         this.server = new Server({
-            name: 'claude_code_mesh',
+            name: 'meshseeks',
             version: '1.0.0',
         }, {
             capabilities: {
@@ -145,15 +143,20 @@ class MeshEnhancedServer {
             const fullToolName = args.params.name;
             const toolName = fullToolName.includes(':') ? fullToolName.split(':')[1] : fullToolName;
             const toolArguments = args.params.arguments;
+            console.error(`[Mesh] Received tool call: ${fullToolName} -> ${toolName}`);
             try {
                 switch (toolName) {
                     case 'mesh_analyze_problem':
+                    case 'analyze_problem':
                         return await this.handleAnalyzeProblem(toolArguments);
                     case 'mesh_execute_tasks':
+                    case 'execute_tasks':
                         return await this.handleExecuteTasks(toolArguments);
                     case 'mesh_solve_problem':
+                    case 'solve_problem':
                         return await this.handleSolveProblem(toolArguments);
                     case 'mesh_status':
+                    case 'status':
                         return await this.handleMeshStatus();
                     default:
                         throw new McpError(ErrorCode.MethodNotFound, `Mesh tool ${toolName} not found`);

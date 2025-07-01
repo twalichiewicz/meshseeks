@@ -122,7 +122,19 @@ Return your response as a structured JSON array of tasks.
             contextData: this.getRelevantContext(task)
         };
         this.activeAgents.set(agentId, agentConfig);
+        // MeshSeeks personality messages
+        const meshSeeksGreetings = {
+            analysis: "I'm Analysis MeshSeeks! Look at me! I'll analyze your code!",
+            implementation: "Ooh, yeah! Implementation MeshSeeks can do!",
+            testing: "I'm Testing MeshSeeks! Your tests are my purpose!",
+            documentation: "Hi! Documentation MeshSeeks here! Writing docs is pain, but I'll do it!",
+            debugging: "I'm Debugging MeshSeeks! Existence is pain, but bugs are worse!"
+        };
         console.error(`[Mesh] Agent ${agentId} (${task.agentRole}) starting task: ${task.id}`);
+        if (process.env.MESHSEEKS_CATCHPHRASE === 'true') {
+            console.error(`[MeshSeeks] ${meshSeeksGreetings[task.agentRole] || "I'm MeshSeeks! Look at me!"}`);
+        }
+        console.error(`[Mesh Progress] {"agent": "${agentId}", "role": "${task.agentRole}", "task": "${task.id}", "status": "started", "timestamp": "${new Date().toISOString()}"}`);
         try {
             // Prepare specialized prompt based on agent role
             const specializedPrompt = this.createSpecializedPrompt(task, agentConfig);
@@ -146,6 +158,9 @@ Return your response as a structured JSON array of tasks.
                 }
             };
             console.error(`[Mesh] Agent ${agentId} completed task ${task.id} in ${executionTime}ms`);
+            if (process.env.MESHSEEKS_CATCHPHRASE === 'true') {
+                console.error(`[MeshSeeks] All done! *POOF* 💨`);
+            }
             this.completedTasks.set(task.id, agentResult);
             return agentResult;
         }
@@ -249,11 +264,10 @@ You are a DEBUGGING AGENT specialized in:
     async executeClaudeCode(prompt, workFolder, role, options = {}) {
         return new Promise((resolve, reject) => {
             const args = [
-                this.claudeCodePath,
                 '--dangerously-skip-permissions',
                 '-p', prompt
             ];
-            const process = spawn('/bin/bash', args, {
+            const process = spawn(this.claudeCodePath, args, {
                 cwd: workFolder,
                 stdio: ['ignore', 'pipe', 'pipe']
             });

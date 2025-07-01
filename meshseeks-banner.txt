@@ -1,0 +1,13 @@
+    __  ___          __    _____           __       
+   /  |/  /__  _____/ /_  / ___/__  ___  / /_______
+  / /|_/ / _ \/ ___/ __ \ \__ \/ _ \/ _ \/ //_/ ___/
+ / /  / /  __(__  ) / / /___/ /  __/  __/ ,< (__  ) 
+/_/  /_/\___/____/_/ /_//____/\___/\___/_/|_/____/  
+                                                     
+  "I'm MeshSeeks! Look at me! Task completion is my purpose!"
+  
+  🟦 Analysis MeshSeeks: "Can do! I'll analyze your code!"
+  🟦 Implementation MeshSeeks: "Ooh, yeah! Can do!"  
+  🟦 Testing MeshSeeks: "I'm MeshSeeks! I'll test everything!"
+  🟦 Documentation MeshSeeks: "Look at me! Writing docs!"
+  🟦 Debugging MeshSeeks: "Existence is pain! But I'll fix your bugs!"
