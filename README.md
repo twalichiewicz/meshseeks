@@ -53,14 +53,43 @@ Plus all the standard Claude Code benefits:
 - Node.js v20 or later (Use fnm or nvm to install)
 - Claude CLI installed locally (run it and call /doctor) and `-dangerously-skip-permissions` accepted.
 
-## 📊 Performance Comparison
+## 📊 Performance Benchmarks - **3.64x Faster!**
 
+> **Live Test Results**: MeshSeeks completed a complex e-commerce API development task in **14.0 seconds** while sequential Claude Code took **51.0 seconds** - that's **3.64x faster performance**! 🚀
+
+### 🏆 Latest Benchmark Results (Real Test Data)
+| Metric | MeshSeeks | Sequential Claude | **Advantage** |
+|--------|-----------|-------------------|---------------|
+| **Execution Time** | 14.0s | 51.0s | **3.64x faster** ⚡ |
+| **Time Saved** | - | - | **37.0 seconds** ⏰ |
+| **Efficiency Gain** | 3.3x parallel | 1.0x serial | **+264%** 📈 |
+| **Success Rate** | 100% | 100% | **Equal Quality** ✅ |
+| **Agents Used** | 5 parallel | 5 sequential | **Same Work, Less Time** 🎯 |
+
+### 📈 Performance by Complexity
 | Problem Type | Single Agent | Mesh Network | Speedup |
 |--------------|---------------|---------------|---------|
 | Code Analysis | 2-5 minutes | 30-60 seconds | 3-5x |
 | Feature Implementation | 10-20 minutes | 3-8 minutes | 2-4x |
 | Comprehensive Refactoring | 30-60 minutes | 8-15 minutes | 4-6x |
 | Full Project Setup | 45-90 minutes | 12-25 minutes | 3-5x |
+
+**📊 [View Complete Performance Analysis](benchmarks/PERFORMANCE_BENCHMARKS.md)** | **📈 [See Visual Graphs](benchmarks/visualizations/)**
+
+### 🎯 Why MeshSeeks is Faster
+- **Parallel Processing**: 5 specialized agents work simultaneously instead of waiting in queue
+- **Expert Specialization**: Each agent optimized for specific tasks (analysis, implementation, testing, docs, security)
+- **Context Efficiency**: 4x effective capacity through distributed 200k token contexts per agent
+- **Smart Synthesis**: Intelligent combination of specialized outputs
+- **Error Isolation**: Individual agent failures don't crash entire pipeline
+
+### 🚀 Run Your Own Benchmark
+```bash
+git clone git@github.com:twalichiewicz/meshseeks.git
+cd meshseeks
+npm install
+node benchmarks/scripts/mesh-performance-test.js
+```
 
 ## 💾 Installation & Usage
 

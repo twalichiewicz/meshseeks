@@ -1,0 +1,2 @@
+timestamp,test_id,mesh_duration_s,sequential_duration_s,speedup,time_saved_s,efficiency_gain_pct,mesh_agents,mesh_success_rate,sequential_success_rate,recommendation
+2025-07-01T22:49:57.499Z,benchmark-1751410197499,14.00,51.01,3.64,37.00,264.26,5,100.0,100.0,"Strongly Recommended - Excellent Performance"
