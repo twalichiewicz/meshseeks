@@ -1,17 +1,22 @@
 {
-  "name": "@grahama1970/claude-code-mcp-enhanced",
-  "version": "1.13.0",
-  "description": "Enhanced MCP server for Claude Code with task orchestration and converter - Fork of @steipete/claude-code-mcp",
-  "author": "Graham A",
+  "name": "@twalichiewicz/claude-code-mcp-mesh",
+  "version": "2.0.0",
+  "description": "Agent Mesh Network MCP server for Claude Code with parallel processing and task orchestration - Enhanced fork with multi-agent capabilities",
+  "author": "Thomas Walichiewicz (based on Graham A's enhanced MCP)",
   "license": "MIT",
   "main": "dist/server.js",
   "bin": {
-    "claude-code-mcp-enhanced": "dist/server.js"
+    "claude-code-mcp-enhanced": "dist/server.js",
+    "claude-code-mcp-mesh": "dist/mesh-server.js"
   },
   "scripts": {
     "build": "tsc",
+    "build:mesh": "tsc && cp .meshconfig dist/",
     "start": "node dist/server.js",
-    "dev": "tsx src/server.ts"
+    "start:mesh": "node dist/mesh-server.js",
+    "dev": "tsx src/server.ts",
+    "dev:mesh": "tsx src/mesh-server.ts",
+    "test:mesh": "tsx src/test-mesh.ts"
   },
   "dependencies": {
     "@eslint/js": "^9.26.0",

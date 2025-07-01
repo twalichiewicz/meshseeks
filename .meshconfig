@@ -1,0 +1,70 @@
+{
+  "meshNetwork": {
+    "maxConcurrentAgents": 5,
+    "defaultTimeout": 300000,
+    "retryAttempts": 2,
+    "agentSpecializations": {
+      "analysis": {
+        "description": "Code analysis, architecture review, dependency mapping",
+        "defaultModel": "claude-3-sonnet-20240229",
+        "timeout": 180000,
+        "priority": "high"
+      },
+      "implementation": {
+        "description": "Code writing, feature implementation, bug fixes",
+        "defaultModel": "claude-3-5-sonnet-20241022",
+        "timeout": 600000,
+        "priority": "medium"
+      },
+      "testing": {
+        "description": "Test creation, validation, quality assurance",
+        "defaultModel": "claude-3-sonnet-20240229",
+        "timeout": 300000,
+        "priority": "medium"
+      },
+      "documentation": {
+        "description": "Documentation writing, README creation, API docs",
+        "defaultModel": "claude-3-sonnet-20240229",
+        "timeout": 240000,
+        "priority": "low"
+      },
+      "debugging": {
+        "description": "Issue diagnosis, error fixing, troubleshooting",
+        "defaultModel": "claude-3-5-sonnet-20241022",
+        "timeout": 450000,
+        "priority": "high"
+      }
+    },
+    "coordinationStrategies": {
+      "analysis_first": {
+        "description": "Analyze problem, then implement based on findings",
+        "phases": ["analysis", "implementation", "testing", "documentation"]
+      },
+      "parallel_exploration": {
+        "description": "Multiple agents explore different aspects simultaneously",
+        "parallelism": "maximum",
+        "convergence": "synthesis"
+      },
+      "iterative_refinement": {
+        "description": "Cycles of analysis and implementation with feedback",
+        "iterations": 3,
+        "feedback": true
+      }
+    }
+  },
+  "integration": {
+    "claudeCodePath": "claude",
+    "baseServer": "./src/server.ts",
+    "meshExtensions": "./src/mesh-coordinator.ts",
+    "sharedContext": true,
+    "resultAggregation": "intelligent_synthesis"
+  },
+  "monitoring": {
+    "enabled": true,
+    "metrics": ["execution_time", "success_rate", "agent_efficiency"],
+    "logging": {
+      "level": "info",
+      "destinations": ["stderr", "file"]
+    }
+  }
+}
