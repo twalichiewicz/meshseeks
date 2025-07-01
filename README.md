@@ -1,3 +1,13 @@
+# ⚠️ This Fork Has Moved to MeshSeeks!
+
+This fork has evolved into **MeshSeeks** - a standalone multi-agent mesh network for Claude.
+
+👉 **Active development continues at: [github.com/twalichiewicz/meshseeks](https://github.com/twalichiewicz/meshseeks)**
+
+This repository is kept for historical reference and attribution to the original enhanced MCP server by Graham.
+
+---
+
 # 🟦 MeshSeeks - I'm MeshSeeks, Look at Me!
 
 > **Multi-Agent Mesh Network for Parallel AI Task Completion**
