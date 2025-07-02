@@ -16,7 +16,13 @@
     "start:mesh": "node dist/mesh-server.js",
     "dev": "tsx src/server.ts",
     "dev:mesh": "tsx src/mesh-server.ts",
-    "test:mesh": "tsx src/test-mesh.ts"
+    "test:mesh": "tsx src/test-mesh.ts",
+    "demo:status": "tsx src/demo-status-board.ts",
+    "test:all": "tsx src/tests/run-all-tests.ts",
+    "test:unit": "tsx src/tests/mesh-coordinator.test.ts",
+    "test:integration": "tsx src/tests/mesh-server.integration.test.ts",
+    "test:errors": "tsx src/tests/mesh-error-handling.test.ts",
+    "test:performance": "tsx src/tests/mesh-performance.test.ts"
   },
   "dependencies": {
     "@eslint/js": "^9.26.0",

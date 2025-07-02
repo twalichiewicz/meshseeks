@@ -415,6 +415,8 @@ Estimated execution time: ~${estimatedTime} seconds with ${maxConcurrent} concur
         console.error('Claude Code Mesh Network MCP server running on stdio');
     }
 }
+// Export the class
+export { MeshEnhancedServer };
 // Create and run the mesh server
 const meshServer = new MeshEnhancedServer();
 meshServer.run().catch(console.error);

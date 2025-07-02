@@ -14,6 +14,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+import { getStatusBoard } from './status-board.js';
 
 // Agent specialization types
 export type AgentRole = 'analysis' | 'implementation' | 'testing' | 'documentation' | 'debugging';
@@ -58,17 +59,23 @@ export class MeshCoordinator {
   private completedTasks: Map<string, AgentResult> = new Map();
   private pendingTasks: Map<string, TaskRequest> = new Map();
   private contextStore: Map<string, any> = new Map();
+  private statusBoard = getStatusBoard();
+  private meshId: string;
 
   constructor(
     private claudeCodePath: string = 'claude',
     private maxConcurrentAgents: number = 5
-  ) {}
+  ) {
+    this.meshId = `mesh-${randomUUID().substring(0, 8)}`;
+    this.statusBoard.addProgressUpdate(`MeshCoordinator initialized (${this.meshId})`);
+  }
 
   /**
    * Analyze a complex problem and create a task decomposition plan
    */
   async analyzeProblem(prompt: string, workFolder: string): Promise<TaskRequest[]> {
     const analysisId = randomUUID();
+    this.statusBoard.addProgressUpdate(`Starting problem analysis: ${prompt.substring(0, 50)}...`);
     
     // Use the lead agent to analyze and decompose the problem
     const analysisPrompt = `
@@ -98,15 +105,32 @@ For each task, specify:
 Return your response as a structured JSON array of tasks.
 `;
 
-    const result = await this.executeClaudeCode(analysisPrompt, workFolder, 'analysis');
-    
-    // Parse the result to extract task breakdown
     try {
+      const result = await this.executeClaudeCode(analysisPrompt, workFolder, 'analysis');
+      this.statusBoard.addProgressUpdate(`Problem analysis completed, extracting tasks...`);
+      
+      // Parse the result to extract task breakdown
       const taskData = this.extractTasksFromResponse(result);
-      return this.createTaskRequests(taskData, workFolder);
+      const tasks = this.createTaskRequests(taskData, workFolder);
+      
+      // Add tasks to status board
+      for (const task of tasks) {
+        this.statusBoard.addTask(task.id, task.prompt, task.dependencies);
+      }
+      
+      this.statusBoard.showSuccess(`Generated ${tasks.length} specialized tasks`);
+      return tasks;
     } catch (error) {
+      this.statusBoard.showWarning(`Analysis failed, using fallback task structure: ${error}`);
       // Fallback: create basic task structure
-      return this.createDefaultTaskBreakdown(prompt, workFolder);
+      const fallbackTasks = this.createDefaultTaskBreakdown(prompt, workFolder);
+      
+      // Add fallback tasks to status board
+      for (const task of fallbackTasks) {
+        this.statusBoard.addTask(task.id, task.prompt, task.dependencies);
+      }
+      
+      return fallbackTasks;
     }
   }
 
@@ -117,12 +141,12 @@ Return your response as a structured JSON array of tasks.
     const results: AgentResult[] = [];
     const executionGroups = this.groupTasksByDependencies(tasks);
 
-    console.error(`[Mesh] Executing ${tasks.length} tasks across ${executionGroups.length} dependency groups`);
+    this.statusBoard.addProgressUpdate(`Executing ${tasks.length} tasks across ${executionGroups.length} dependency groups`);
 
     // Execute tasks in dependency order
     for (let groupIndex = 0; groupIndex < executionGroups.length; groupIndex++) {
       const group = executionGroups[groupIndex];
-      console.error(`[Mesh] Executing group ${groupIndex + 1}/${executionGroups.length} with ${group.length} tasks`);
+      this.statusBoard.addProgressUpdate(`Executing group ${groupIndex + 1}/${executionGroups.length} with ${group.length} tasks`);
 
       // Execute tasks in the group in parallel (up to max concurrent limit)
       const groupResults = await this.executeTaskGroup(group);
@@ -132,10 +156,14 @@ Return your response as a structured JSON array of tasks.
       for (const result of groupResults) {
         if (result.success) {
           this.contextStore.set(result.taskId, result);
+          this.statusBoard.updateTaskStatus(result.taskId, 'completed', 100);
+        } else {
+          this.statusBoard.updateTaskStatus(result.taskId, 'failed', 0, undefined, result.error);
         }
       }
     }
 
+    this.statusBoard.showSuccess(`Mesh execution completed: ${results.filter(r => r.success).length}/${results.length} tasks successful`);
     return results;
   }
 
@@ -173,6 +201,12 @@ Return your response as a structured JSON array of tasks.
     };
 
     this.activeAgents.set(agentId, agentConfig);
+    
+    // Register agent with status board
+    this.statusBoard.registerAgent(agentId, task.agentRole);
+    this.statusBoard.updateAgentStatus(agentId, 'working', task.prompt.substring(0, 50) + '...', 0);
+    this.statusBoard.updateTaskStatus(task.id, 'running', 0, agentId);
+    
     // MeshSeeks personality messages
     const meshSeeksGreetings = {
       analysis: "I'm Analysis MeshSeeks! Look at me! I'll analyze your code!",
@@ -182,11 +216,9 @@ Return your response as a structured JSON array of tasks.
       debugging: "I'm Debugging MeshSeeks! Existence is pain, but bugs are worse!"
     };
 
-    console.error(`[Mesh] Agent ${agentId} (${task.agentRole}) starting task: ${task.id}`);
     if (process.env.MESHSEEKS_CATCHPHRASE === 'true') {
-      console.error(`[MeshSeeks] ${meshSeeksGreetings[task.agentRole] || "I'm MeshSeeks! Look at me!"}`);
+      this.statusBoard.addProgressUpdate(`${meshSeeksGreetings[task.agentRole] || "I'm MeshSeeks! Look at me!"}`);
     }
-    console.error(`[Mesh Progress] {"agent": "${agentId}", "role": "${task.agentRole}", "task": "${task.id}", "status": "started", "timestamp": "${new Date().toISOString()}"}`);
 
     try {
       // Prepare specialized prompt based on agent role
@@ -219,9 +251,9 @@ Return your response as a structured JSON array of tasks.
         }
       };
 
-      console.error(`[Mesh] Agent ${agentId} completed task ${task.id} in ${executionTime}ms`);
+      this.statusBoard.updateAgentStatus(agentId, 'completed', task.prompt.substring(0, 50) + '...', 100);
       if (process.env.MESHSEEKS_CATCHPHRASE === 'true') {
-        console.error(`[MeshSeeks] All done! *POOF* 💨`);
+        this.statusBoard.addProgressUpdate(`All done! *POOF* 💨`);
       }
       this.completedTasks.set(task.id, agentResult);
       
@@ -240,12 +272,14 @@ Return your response as a structured JSON array of tasks.
         executionTime
       };
 
-      console.error(`[Mesh] Agent ${agentId} failed task ${task.id}: ${errorMessage}`);
+      this.statusBoard.updateAgentStatus(agentId, 'failed', task.prompt.substring(0, 50) + '...', 0);
+      this.statusBoard.showError(`Agent ${agentId} failed: ${errorMessage}`);
       this.completedTasks.set(task.id, agentResult);
       
       return agentResult;
     } finally {
       this.activeAgents.delete(agentId);
+      this.statusBoard.removeAgent(agentId);
     }
   }
 
@@ -520,10 +554,13 @@ You are a DEBUGGING AGENT specialized in:
    */
   getStatus() {
     return {
+      meshId: this.meshId,
       activeAgents: this.activeAgents.size,
       completedTasks: this.completedTasks.size,
       pendingTasks: this.pendingTasks.size,
       contextEntries: this.contextStore.size,
+      maxConcurrency: this.maxConcurrentAgents,
+      agentRoles: ['analysis', 'implementation', 'testing', 'documentation', 'debugging'] as AgentRole[],
       agents: Array.from(this.activeAgents.values()),
       recentResults: Array.from(this.completedTasks.values()).slice(-5)
     };

@@ -482,6 +482,9 @@ Estimated execution time: ~${estimatedTime} seconds with ${maxConcurrent} concur
   }
 }
 
+// Export the class
+export { MeshEnhancedServer };
+
 // Create and run the mesh server
 const meshServer = new MeshEnhancedServer();
 meshServer.run().catch(console.error);

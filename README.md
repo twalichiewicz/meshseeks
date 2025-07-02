@@ -14,6 +14,7 @@ MeshSeeks spawns specialized AI agents that work in parallel to solve complex co
 - **4x Context Capacity**: Each agent has its own 200k token context window
 - **Smart Coordination**: Dependency management and intelligent task distribution
 - **Result Synthesis**: Automatic aggregation and conflict resolution
+- **🆕 Real-Time Status Board**: Live visual feedback prevents "hanging" appearance
 
 ### Enhanced MCP Tools
 In addition to Graham's enhanced tools, the mesh network provides:
@@ -21,6 +22,16 @@ In addition to Graham's enhanced tools, the mesh network provides:
 - `mesh_execute_tasks` - Execute tasks with dependency management
 - `mesh_solve_problem` - End-to-end problem solving with multiple strategies
 - `mesh_status` - Monitor network performance and agent metrics
+
+### 🆕 Real-Time Status Board
+No more black screens! The new status board provides:
+- **Live Updates**: Visual progress refreshing every second
+- **Agent Tracking**: See which agents are active and what they're working on
+- **Task Progress**: Progress bars and dependency visualization
+- **Performance Metrics**: Throughput, timing, and success rates
+- **Activity Log**: Recent events and status changes
+
+Run `npm run demo:status` to see it in action!
 
 ## 🔍 Overview
 
@@ -1178,6 +1189,49 @@ This server, through its unified `claude_code` tool, unlocks a wide range of pow
 
 **CRITICAL: Remember to provide Current Working Directory (CWD) context in your prompts for file system or git operations (e.g., `"Your work folder is /path/to/project\n\n...your command..."`).**
 
+## 🧪 Testing & Development
+
+### Comprehensive Test Suite
+MeshSeeks includes a complete testing framework with:
+
+**Unit Tests** - Test core coordinator functionality:
+```bash
+npm run test:unit
+```
+
+**Integration Tests** - Test MCP server tools:
+```bash
+npm run test:integration
+```
+
+**Error Handling Tests** - Test failure scenarios:
+```bash
+npm run test:errors
+```
+
+**Performance Tests** - Test scalability and concurrency:
+```bash
+npm run test:performance
+```
+
+**Run All Tests** - Complete test suite:
+```bash
+npm run test:all
+```
+
+### Status Board Demo
+See the real-time status board in action:
+```bash
+npm run demo:status
+```
+
+### Development Scripts
+```bash
+npm run dev:mesh       # Run mesh server in development mode
+npm run build:mesh     # Build for production
+npm run test:mesh      # Run basic mesh tests
+```
+
 ## 🔧 Troubleshooting
 
 - **"Command not found" (claude-code-mcp):** If installed globally, ensure the npm global bin directory is in your system's PATH. If using `npx`, ensure `npx` itself is working.
@@ -1196,8 +1250,10 @@ If you want to develop or contribute to this server, or run it from a cloned rep
 ## 📚 Additional Documentation
 
 - **[Mesh Network Architecture Guide](./MESH_NETWORK.md)** - Detailed documentation on the agent mesh network
+- **[Status Board Guide](./STATUS_BOARD.md)** - Real-time visualization and monitoring
 - **[Quick Start Guide](./QUICKSTART.md)** - Get up and running quickly
 - **[Local Development Setup](./docs/local_install.md)** - For contributors and developers
+- **[Test Suite Documentation](./src/tests/README.md)** - Comprehensive testing guide
 
 ## 💪 Contributing
 
