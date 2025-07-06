@@ -32,3 +32,13 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Test and development files
+test*.json
+test*.js
+converted_tasks.json
+mesh-monitor.js
+print-eslint-config.js
+watch-mesh.sh
+start.bat
+start.sh
