@@ -1,1 +1,34 @@
+# Source files
+src/
+*.ts
+!dist/**/*.d.ts
+
+# Development files
+.github/
+.vscode/
 assets/
+benchmarks/
+docs/
+examples/
+tests/
+
+# Config files
+.gitignore
+.eslintrc*
+tsconfig.json
+*.md
+!README.md
+!LICENSE
+
+# Build artifacts
+*.tsbuildinfo
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~

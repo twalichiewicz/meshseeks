@@ -1,6 +1,6 @@
 {
   "name": "@thomaswalichiewicz/meshseeks-mcp-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "I'm MeshSeeks, look at me! 🟦 A multi-agent mesh network for parallel AI task completion",
   "author": "Thomas Walichiewicz",
   "license": "MIT",
@@ -41,7 +41,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/twalichiewicz/claude-code-mcp-enhanced.git"
+    "url": "git+https://github.com/twalichiewicz/meshseeks.git"
   },
   "keywords": [
     "mcp",
@@ -56,7 +56,7 @@
     "agent-orchestration"
   ],
   "bugs": {
-    "url": "https://github.com/twalichiewicz/claude-code-mcp-enhanced/issues"
+    "url": "https://github.com/twalichiewicz/meshseeks/issues"
   },
-  "homepage": "https://github.com/twalichiewicz/claude-code-mcp-enhanced#readme"
+  "homepage": "https://github.com/twalichiewicz/meshseeks#readme"
 }
