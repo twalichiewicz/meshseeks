@@ -11,7 +11,7 @@
  */
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { getStatusBoard } from './status-board.js';
+import { getStatusBoard } from './status-board-stderr.js';
 /**
  * Mesh Network Coordinator
  *
@@ -21,17 +21,19 @@ import { getStatusBoard } from './status-board.js';
 export class MeshCoordinator {
     claudeCodePath;
     maxConcurrentAgents;
+    defaultTimeoutMs;
     activeAgents = new Map();
     completedTasks = new Map();
     pendingTasks = new Map();
     contextStore = new Map();
     statusBoard = getStatusBoard();
     meshId;
-    constructor(claudeCodePath = 'claude', maxConcurrentAgents = 5) {
+    constructor(claudeCodePath = 'claude', maxConcurrentAgents = 5, defaultTimeoutMs = parseInt(process.env.MCP_EXECUTION_TIMEOUT_MS || '1800000', 10)) {
         this.claudeCodePath = claudeCodePath;
         this.maxConcurrentAgents = maxConcurrentAgents;
+        this.defaultTimeoutMs = defaultTimeoutMs;
         this.meshId = `mesh-${randomUUID().substring(0, 8)}`;
-        this.statusBoard.addProgressUpdate(`MeshCoordinator initialized (${this.meshId})`);
+        this.statusBoard.addProgressUpdate(`MeshCoordinator initialized (${this.meshId}) with ${this.defaultTimeoutMs / 1000}s timeout`);
     }
     /**
      * Analyze a complex problem and create a task decomposition plan
@@ -101,19 +103,44 @@ Return your response as a structured JSON array of tasks.
         for (let groupIndex = 0; groupIndex < executionGroups.length; groupIndex++) {
             const group = executionGroups[groupIndex];
             this.statusBoard.addProgressUpdate(`Executing group ${groupIndex + 1}/${executionGroups.length} with ${group.length} tasks`);
+            // Send progress to Claude with friendly ASCII art
+            const groupAgents = group.map(t => {
+                const roleEmojis = {
+                    analysis: '🔍',
+                    implementation: '⚙️',
+                    testing: '🧪',
+                    documentation: '📝',
+                    debugging: '🐛'
+                };
+                return `${roleEmojis[t.agentRole] || '🤖'} ${t.agentRole}`;
+            }).join(', ');
+            console.error(`\n┌────────────────────────────────────────────────────┐`);
+            console.error(`│ 🚀 LAUNCHING AGENT BATCH ${groupIndex + 1} of ${executionGroups.length}                   │`);
+            console.error(`├────────────────────────────────────────────────────┤`);
+            console.error(`│ Agents: ${groupAgents.padEnd(42)} │`);
+            console.error(`│ Tasks: ${group.length} parallel operations                       │`);
+            console.error(`└────────────────────────────────────────────────────┘\n`);
             // Execute tasks in the group in parallel (up to max concurrent limit)
             const groupResults = await this.executeTaskGroup(group);
             results.push(...groupResults);
             // Update context store with results for dependent tasks
+            let groupSuccessCount = 0;
             for (const result of groupResults) {
                 if (result.success) {
                     this.contextStore.set(result.taskId, result);
                     this.statusBoard.updateTaskStatus(result.taskId, 'completed', 100);
+                    groupSuccessCount++;
                 }
                 else {
                     this.statusBoard.updateTaskStatus(result.taskId, 'failed', 0, undefined, result.error);
                 }
             }
+            // Report group completion with friendly message
+            console.error(`\n┌────────────────────────────────────────────────────┐`);
+            console.error(`│ ✅ BATCH ${groupIndex + 1} COMPLETE!                             │`);
+            console.error(`├────────────────────────────────────────────────────┤`);
+            console.error(`│ Success rate: ${groupSuccessCount}/${group.length} tasks (${Math.round(groupSuccessCount / group.length * 100)}%)              │`);
+            console.error(`└────────────────────────────────────────────────────┘\n`);
         }
         this.statusBoard.showSuccess(`Mesh execution completed: ${results.filter(r => r.success).length}/${results.length} tasks successful`);
         return results;
@@ -150,6 +177,11 @@ Return your response as a structured JSON array of tasks.
         this.statusBoard.registerAgent(agentId, task.agentRole);
         this.statusBoard.updateAgentStatus(agentId, 'working', task.prompt.substring(0, 50) + '...', 0);
         this.statusBoard.updateTaskStatus(task.id, 'running', 0, agentId);
+        // Send progress to Claude with agent personality
+        console.error(`\n┌─ ${task.agentRole.toUpperCase()} AGENT STARTING ─────────────────┐`);
+        console.error(`│ 🆔 Task: ${task.id.padEnd(36)} │`);
+        console.error(`│ 📁 Directory: ${agentConfig.workFolder.substring(agentConfig.workFolder.lastIndexOf('/') + 1).padEnd(29)} │`);
+        console.error(`└────────────────────────────────────────────────┘`);
         // MeshSeeks personality messages
         const meshSeeksGreetings = {
             analysis: "I'm Analysis MeshSeeks! Look at me! I'll analyze your code!",
@@ -164,8 +196,9 @@ Return your response as a structured JSON array of tasks.
         try {
             // Prepare specialized prompt based on agent role
             const specializedPrompt = this.createSpecializedPrompt(task, agentConfig);
-            // Execute the task using Claude Code
-            const result = await this.executeClaudeCode(specializedPrompt, task.workFolder, task.agentRole, {
+            // Execute the task using Claude Code with auto-detected working directory
+            const workFolder = task.workFolder || process.cwd();
+            const result = await this.executeClaudeCode(specializedPrompt, workFolder, task.agentRole, {
                 parentTaskId: task.parentTaskId,
                 returnMode: task.returnMode,
                 taskDescription: `${task.agentRole} task: ${task.id}`
@@ -188,6 +221,8 @@ Return your response as a structured JSON array of tasks.
                 this.statusBoard.addProgressUpdate(`All done! *POOF* 💨`);
             }
             this.completedTasks.set(task.id, agentResult);
+            // Report completion to Claude with celebratory message
+            console.error(`\n🎉 ${task.agentRole.toUpperCase()} agent finished! Task ${task.id} done in ${(executionTime / 1000).toFixed(1)}s`);
             return agentResult;
         }
         catch (error) {
@@ -204,6 +239,9 @@ Return your response as a structured JSON array of tasks.
             this.statusBoard.updateAgentStatus(agentId, 'failed', task.prompt.substring(0, 50) + '...', 0);
             this.statusBoard.showError(`Agent ${agentId} failed: ${errorMessage}`);
             this.completedTasks.set(task.id, agentResult);
+            // Report failure to Claude with helpful tone
+            console.error(`\n😓 ${task.agentRole.toUpperCase()} agent had trouble with task ${task.id}`);
+            console.error(`   Issue: ${errorMessage}`);
             return agentResult;
         }
         finally {
@@ -287,9 +325,12 @@ You are a DEBUGGING AGENT specialized in:
         return instructions[role] || 'You are a specialized agent focused on your assigned task.';
     }
     /**
-     * Execute Claude Code with enhanced error handling and retry logic
+     * Execute Claude Code with enhanced error handling, timeout protection, and retry logic
      */
     async executeClaudeCode(prompt, workFolder, role, options = {}) {
+        // Get timeout from options or use default from constructor
+        const executionTimeoutMs = options.timeout || this.defaultTimeoutMs;
+        const heartbeatIntervalMs = parseInt(process.env.MCP_HEARTBEAT_INTERVAL_MS || '15000', 10);
         return new Promise((resolve, reject) => {
             const args = [
                 '--dangerously-skip-permissions',
@@ -297,10 +338,25 @@ You are a DEBUGGING AGENT specialized in:
             ];
             const process = spawn(this.claudeCodePath, args, {
                 cwd: workFolder,
-                stdio: ['ignore', 'pipe', 'pipe']
+                stdio: ['ignore', 'pipe', 'pipe'],
+                timeout: executionTimeoutMs
             });
             let stdout = '';
             let stderr = '';
+            let executionStartTime = Date.now();
+            let heartbeatCounter = 0;
+            // Set up progress reporter to prevent client timeouts and provide status updates
+            const progressReporter = setInterval(() => {
+                heartbeatCounter++;
+                const elapsedSeconds = Math.floor((Date.now() - executionStartTime) / 1000);
+                const heartbeatMessage = `⏱️  ${role} agent still working... ${elapsedSeconds}s elapsed`;
+                // Report progress to status board
+                this.statusBoard.addProgressUpdate(heartbeatMessage);
+                // Send periodic encouragement to Claude
+                if (heartbeatCounter % 3 === 0) {
+                    console.error(`💪 ${role.toUpperCase()} agent is making progress... hang tight!`);
+                }
+            }, heartbeatIntervalMs);
             process.stdout.on('data', (data) => {
                 stdout += data.toString();
             });
@@ -308,6 +364,8 @@ You are a DEBUGGING AGENT specialized in:
                 stderr += data.toString();
             });
             process.on('close', (code) => {
+                clearInterval(progressReporter);
+                const executionTimeMs = Date.now() - executionStartTime;
                 if (code === 0) {
                     resolve(stdout);
                 }
@@ -316,7 +374,20 @@ You are a DEBUGGING AGENT specialized in:
                 }
             });
             process.on('error', (error) => {
-                reject(new Error(`Failed to spawn Claude Code process: ${error.message}`));
+                clearInterval(progressReporter);
+                let errorMessage = `Failed to spawn Claude Code process: ${error.message}`;
+                // Add additional error context
+                if (error.code === 'ETIMEDOUT') {
+                    errorMessage = `Claude Code execution timed out after ${executionTimeoutMs / 1000}s: ${error.message}`;
+                }
+                if (error.path) {
+                    errorMessage += ` | Path: ${error.path}`;
+                }
+                if (error.syscall) {
+                    errorMessage += ` | Syscall: ${error.syscall}`;
+                }
+                errorMessage += `\nStderr: ${stderr.trim()}`;
+                reject(new Error(errorMessage));
             });
         });
     }
@@ -337,12 +408,12 @@ You are a DEBUGGING AGENT specialized in:
         }
         return [];
     }
-    createTaskRequests(taskData, workFolder) {
+    createTaskRequests(taskData, defaultWorkFolder) {
         return taskData.map((task, index) => ({
             id: task.id || `task-${index + 1}`,
             prompt: task.description || task.prompt || `Task ${index + 1}`,
             agentRole: task.role || 'implementation',
-            workFolder,
+            workFolder: task.workFolder || defaultWorkFolder,
             returnMode: task.returnMode || 'full',
             dependencies: task.dependencies || []
         }));
@@ -453,6 +524,7 @@ You are a DEBUGGING AGENT specialized in:
             pendingTasks: this.pendingTasks.size,
             contextEntries: this.contextStore.size,
             maxConcurrency: this.maxConcurrentAgents,
+            defaultTimeoutMs: this.defaultTimeoutMs,
             agentRoles: ['analysis', 'implementation', 'testing', 'documentation', 'debugging'],
             agents: Array.from(this.activeAgents.values()),
             recentResults: Array.from(this.completedTasks.values()).slice(-5)
