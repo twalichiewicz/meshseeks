@@ -1,6 +1,6 @@
 {
   "name": "@thomaswalichiewicz/meshseeks-mcp-server",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "I'm MeshSeeks, look at me! 🟦 A multi-agent mesh network for parallel AI task completion",
   "author": "Thomas Walichiewicz",
   "license": "MIT",
