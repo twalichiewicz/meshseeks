@@ -33,6 +33,32 @@ No more black screens! The new status board provides:
 
 Run `npm run demo:status` to see it in action!
 
+## ⚡ Getting Started in 60 Seconds
+
+**Want to see MeshSeeks in action right now?** Here's the fastest path:
+
+```bash
+# 1. Clone and build (30 seconds)
+git clone https://github.com/twalichiewicz/meshseeks.git && cd meshseeks && npm install && npm run build
+
+# 2. Get your config path
+echo "Add to: $(echo ~/Library/Application\ Support/Claude/claude_desktop_config.json)"
+
+# 3. Copy this config (modify the path):
+echo '{
+  "mcpServers": {
+    "meshseeks": {
+      "command": "node",
+      "args": ["'$(pwd)'/dist/mesh-server.js"]
+    }
+  }
+}'
+```
+
+Then restart Claude Desktop and try: `"Use mesh_status to check MeshSeeks"`
+
+**Full installation guide:** [Jump to Quick Start](#-quick-start-5-minutes)
+
 ## 🔍 Overview
 
 This MCP server provides powerful tools that can be used by LLMs to interact with Claude Code. When integrated with Claude Desktop or other MCP clients, it allows LLMs to:
@@ -59,10 +85,6 @@ Plus all the standard Claude Code benefits:
 - File ops, git, or other operations don't need costly models. Claude Code is cost-effective if you sign up for Anthropic Max.
 - Claude has wider system access, so when standard assistants are stuck, just ask them to "use claude code" to unblock progress.
 
-## 📝 Prerequisites
-
-- Node.js v20 or later (Use fnm or nvm to install)
-- Claude CLI installed locally (run it and call /doctor) and `-dangerously-skip-permissions` accepted.
 
 ## 📊 Performance Benchmarks - **3.64x Faster!**
 
@@ -102,114 +124,89 @@ npm install
 node benchmarks/scripts/mesh-performance-test.js
 ```
 
-## 💾 Installation & Usage
+## 🚀 Quick Start (5 Minutes)
 
-You can install and use this MCP server in three different ways:
+### Prerequisites
+1. **Node.js v20+** - Install via [nvm](https://github.com/nvm-sh/nvm) or [fnm](https://github.com/Schniz/fnm)
+2. **Claude CLI** - Install and run once with permissions:
+   ```bash
+   npm install -g @anthropic-ai/claude-code
+   claude --dangerously-skip-permissions  # Run once and accept terms
+   ```
 
-### 🚀 Method 1: Quick Start with MeshSeeks
+### Install MeshSeeks
 
-For Claude Code CLI users, run:
+**Option 1: From GitHub (Recommended)**
 ```bash
-claude mcp add meshseeks node /path/to/meshseeks/dist/mesh-server.js
+# Clone and build
+git clone https://github.com/twalichiewicz/meshseeks.git
+cd meshseeks
+npm install
+npm run build
+
+# Add to your MCP config (see paths below)
 ```
 
-Or add to your `.claude.json`:
+**Option 2: Direct from npm (Coming Soon)**
+```bash
+# Note: Package will be published as @twalichiewicz/meshseeks
+npm install -g @twalichiewicz/meshseeks
+```
+
+### Configure Your Client
+
+Add MeshSeeks to your MCP configuration file:
+
+**Find your config file:**
+- **Claude Desktop**: `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac)
+- **Cursor**: `~/.cursor/mcp.json`
+- **Windsurf**: `~/.codeium/windsurf/mcp_config.json`
+
+**Add this configuration:**
 ```json
 {
   "mcpServers": {
     "meshseeks": {
-      "type": "stdio",
       "command": "node",
-      "args": ["/path/to/meshseeks/dist/mesh-server.js"],
+      "args": ["/absolute/path/to/meshseeks/dist/mesh-server.js"],
       "env": {
         "MCP_MESH_MAX_AGENTS": "5",
-        "MESHSEEKS_CATCHPHRASE": "true"  // Enables "Look at me!" messages
+        "MESHSEEKS_CATCHPHRASE": "true"
       }
     }
   }
 }
 ```
 
-### 📦 Method 2: Via GitHub URL
+> **Tip**: Replace `/absolute/path/to/meshseeks` with your actual path from the clone step
 
-Add the following to your `.mcp.json` file:
+### Verify Installation
 
-```json
-{
-  "mcpServers": {
-    "claude-code-mcp-enhanced": {
-      "command": "npx",
-      "args": [
-        "github:grahama1970/claude-code-mcp-enhanced"
-      ],
-      "env": {
-        "MCP_CLAUDE_DEBUG": "false",
-        "MCP_HEARTBEAT_INTERVAL_MS": "15000",
-        "MCP_EXECUTION_TIMEOUT_MS": "1800000"
-      }
-    }
-  }
-}
-```
-
-### 📦 Method 2: Via npm Package
-
-If the package is published to npm, you can install it using the npm package name:
-
-```json
-{
-  "mcpServers": {
-    "claude-code-mcp-enhanced": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@grahama1970/claude-code-mcp-enhanced@latest"
-      ],
-      "env": {
-        "MCP_CLAUDE_DEBUG": "false",
-        "MCP_HEARTBEAT_INTERVAL_MS": "15000",
-        "MCP_EXECUTION_TIMEOUT_MS": "1800000"
-      }
-    }
-  }
-}
-```
-
-### 🔧 Method 3: Local Installation
-
-For development or testing purposes, you can run the server from a local installation:
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/grahama1970/claude-code-mcp-enhanced.git
-   cd claude-code-mcp-enhanced
+1. **Restart your client** (Claude Desktop, Cursor, or Windsurf)
+2. **Test MeshSeeks**: In a new chat, type:
+   ```
+   Use the mesh_status tool to show me the MeshSeeks network status
+   ```
+3. **See it in action**: 
+   ```
+   Use mesh_solve_problem to create a simple Python calculator with tests
    ```
 
-2. Install dependencies and build:
-   ```bash
-   npm install
-   npm run build
-   ```
+That's it! MeshSeeks is ready to accelerate your coding tasks. 🎉
 
-3. Configure your `.mcp.json` file to use the local server:
+### 🎯 First Task Ideas
 
-```json
-{
-  "mcpServers": {
-    "claude-code-mcp-enhanced": {
-      "command": "node",
-      "args": [
-        "/path/to/claude-code-mcp-enhanced/dist/server.js"
-      ],
-      "env": {
-        "MCP_CLAUDE_DEBUG": "false",
-        "MCP_HEARTBEAT_INTERVAL_MS": "15000",
-        "MCP_EXECUTION_TIMEOUT_MS": "1800000"
-      }
-    }
-  }
-}
-```
+Try these commands to experience the power of parallel agents:
+
+- `"Use mesh_analyze_problem to analyze the architecture of [your project]"`
+- `"Use mesh_execute_tasks to implement a REST API with full CRUD operations"`
+- `"Use mesh_solve_problem to refactor this code with tests and documentation"`
+
+---
+
+## 📚 Detailed Installation Guide
+
+For advanced configuration options, troubleshooting, or manual setup, see our [comprehensive installation guide](docs/INSTALLATION.md).
 
 ## 🔑 Important First-Time Setup: Accepting Permissions
 
