@@ -1,4 +1,6 @@
-# 🟦 MeshSeeks - I'm MeshSeeks, Look at Me!
+<img src="assets/meshSeeksIcon.png" alt="MeshSeeks icon" width="50%">
+
+# MeshSeeks
 
 > **Multi-Agent Mesh Network for Parallel AI Task Completion**
 
