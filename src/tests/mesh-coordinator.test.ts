@@ -215,8 +215,9 @@ class MeshCoordinatorTestSuite {
       if (validationResult.valid) {
         this.allValidationFailures.push('Circular dependency detection failed: should have detected circular dependencies');
       }
-      
-      if (!validationResult.errors.some(error => error.includes('circular'))) {
+
+      // Check for circular dependency error message (case-insensitive)
+      if (!validationResult.errors.some(error => error.toLowerCase().includes('circular'))) {
         this.allValidationFailures.push('Circular dependency error message not found');
       }
       
@@ -245,7 +246,8 @@ class MeshCoordinatorTestSuite {
       // Test role-specific prompt generation
       for (const role of expectedRoles) {
         const prompt = this.generateRoleSpecificPrompt(role as AgentRole, 'Test task');
-        if (!prompt.includes(role)) {
+        // Check case-insensitively since prompt uses uppercase role name
+        if (!prompt.toLowerCase().includes(role.toLowerCase())) {
           this.allValidationFailures.push(`Role-specific prompt for ${role} doesn't include role name`);
         }
       }

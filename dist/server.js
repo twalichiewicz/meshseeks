@@ -3,7 +3,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } from '@modelcontextprotocol/sdk/types.js';
 import { spawn } from 'node:child_process';
-import { existsSync, watch } from 'node:fs';
+import { existsSync, watch, statSync, readFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve as pathResolve } from 'node:path';
@@ -62,14 +62,28 @@ if (useRooModes && watchRooModes) {
                     console.error(`[Info] .roomodes file changed, cache invalidated`);
                 }
             });
-            // Ensure the watcher is closed on process exit
-            process.on('exit', () => {
+            // Helper to close watcher safely
+            const closeWatcher = () => {
                 try {
                     watcher.close();
                 }
                 catch (err) {
                     // Ignore errors during shutdown
                 }
+            };
+            // Ensure the watcher is closed on various shutdown scenarios
+            process.on('exit', closeWatcher);
+            process.on('SIGINT', closeWatcher);
+            process.on('SIGTERM', closeWatcher);
+            process.on('uncaughtException', (err) => {
+                console.error('[Fatal] Uncaught exception:', err);
+                closeWatcher();
+                process.exit(1);
+            });
+            process.on('unhandledRejection', (reason, promise) => {
+                console.error('[Fatal] Unhandled rejection at:', promise, 'reason:', reason);
+                closeWatcher();
+                process.exit(1);
             });
             console.error(`[Setup] Watching .roomodes file for changes`);
         }
@@ -88,24 +102,26 @@ function loadRooModes() {
         if (!existsSync(roomodesPath)) {
             return null;
         }
-        // Check if we have a fresh cached version
-        const fs = require('fs');
-        const stats = fs.statSync(roomodesPath);
+        // Check file modification time
+        const stats = statSync(roomodesPath);
         const fileModifiedTime = stats.mtimeMs;
-        // Use cache if available and fresh
-        if (roomodesCache && roomodesCache.timestamp > fileModifiedTime) {
-            if (Date.now() - roomodesCache.timestamp < CACHE_TTL_MS) {
+        // Use cache if available and file hasn't been modified since caching
+        if (roomodesCache) {
+            const cacheAge = Date.now() - roomodesCache.timestamp;
+            const fileModifiedAfterCache = fileModifiedTime > roomodesCache.fileModifiedTime;
+            if (!fileModifiedAfterCache && cacheAge < CACHE_TTL_MS) {
                 debugLog('[Debug] Using cached .roomodes configuration');
                 return roomodesCache.data;
             }
         }
         // Otherwise read the file and update cache
-        const roomodesContent = fs.readFileSync(roomodesPath, 'utf8');
+        const roomodesContent = readFileSync(roomodesPath, 'utf8');
         const parsedData = JSON.parse(roomodesContent);
-        // Update cache
+        // Update cache with file modification time for proper invalidation
         roomodesCache = {
             data: parsedData,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            fileModifiedTime: fileModifiedTime
         };
         debugLog('[Debug] Loaded fresh .roomodes configuration');
         return parsedData;
@@ -123,7 +139,7 @@ function loadRooModes() {
 async function spawnAsync(command, args, options) {
     return new Promise((resolve, reject) => {
         debugLog(`[Spawn] Running command: ${command} ${args.join(' ')}`);
-        const process = spawn(command, args, {
+        const childProcess = spawn(command, args, {
             shell: false, // Reverted to false
             timeout: options?.timeout,
             cwd: options?.cwd,
@@ -143,12 +159,12 @@ async function spawnAsync(command, args, options) {
             console.error(heartbeatMessage);
             debugLog(heartbeatMessage);
         }, heartbeatIntervalMs);
-        process.stdout.on('data', (data) => { stdout += data.toString(); });
-        process.stderr.on('data', (data) => {
+        childProcess.stdout.on('data', (data) => { stdout += data.toString(); });
+        childProcess.stderr.on('data', (data) => {
             stderr += data.toString();
             debugLog(`[Spawn Stderr Chunk] ${data.toString()}`);
         });
-        process.on('error', (error) => {
+        childProcess.on('error', (error) => {
             clearInterval(progressReporter); // Clean up the interval
             debugLog(`[Spawn Error Event] Full error object:`, error);
             let errorMessage = `Spawn error: ${error.message}`;
@@ -161,7 +177,7 @@ async function spawnAsync(command, args, options) {
             errorMessage += `\nStderr: ${stderr.trim()}`;
             reject(new Error(errorMessage));
         });
-        process.on('close', (code) => {
+        childProcess.on('close', (code) => {
             clearInterval(progressReporter); // Clean up the interval
             const executionTimeMs = Date.now() - executionStartTime;
             debugLog(`[Spawn Close] Exit code: ${code}, Execution time: ${executionTimeMs}ms`);
@@ -356,7 +372,7 @@ class ClaudeCodeServer {
                 // Check if Claude CLI is accessible
                 let claudeCliStatus = 'unknown';
                 try {
-                    const { stdout } = await spawnAsync('/bin/bash', [this.claudeCliPath, '--version'], { timeout: 5000 });
+                    await spawnAsync(this.claudeCliPath, ['--version'], { timeout: 5000 });
                     claudeCliStatus = 'available';
                 }
                 catch (error) {
@@ -568,7 +584,8 @@ ${returnMode === 'summary' ? 'IMPORTANT: Keep your response concise and focused 
             }
             try {
                 debugLog(`[Debug] Attempting to execute Claude CLI with prompt: "${prompt}" in CWD: "${effectiveCwd}"`);
-                let claudeProcessArgs = [this.claudeCliPath, '--dangerously-skip-permissions'];
+                // Build CLI arguments (without the executable path)
+                const claudeProcessArgs = ['--dangerously-skip-permissions'];
                 // Handle Roo mode selection if enabled and specified
                 if (useRooModes && mode) {
                     // Load room modes configuration
@@ -595,16 +612,15 @@ ${returnMode === 'summary' ? 'IMPORTANT: Keep your response concise and focused 
                 }
                 // Add the prompt
                 claudeProcessArgs.push('-p', prompt);
-                debugLog(`[Debug] Invoking /bin/bash with args: ${claudeProcessArgs.join(' ')}`);
+                debugLog(`[Debug] Invoking Claude CLI: ${this.claudeCliPath} ${claudeProcessArgs.join(' ')}`);
                 // Use retry for robust execution
                 const { stdout, stderr } = await retry(async (bail, attemptNumber) => {
                     try {
                         if (attemptNumber > 1) {
                             debugLog(`[Retry] Attempt ${attemptNumber}/${maxRetries + 1} for Claude CLI execution`);
                         }
-                        return await spawnAsync('/bin/bash', // Explicitly use /bin/bash as the command
-                        claudeProcessArgs, // Pass the script path as the first argument to bash
-                        { timeout: executionTimeoutMs, cwd: effectiveCwd });
+                        // Spawn the Claude CLI directly (cross-platform compatible)
+                        return await spawnAsync(this.claudeCliPath, claudeProcessArgs, { timeout: executionTimeoutMs, cwd: effectiveCwd });
                     }
                     catch (err) {
                         // Log the error

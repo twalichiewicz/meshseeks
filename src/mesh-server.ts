@@ -9,6 +9,7 @@ import {
   type ServerResult,
 } from '@modelcontextprotocol/sdk/types.js';
 import MeshCoordinator, { type TaskRequest, type AgentResult } from './mesh-coordinator.js';
+import { stopStatusBoard } from './status-board-stderr.js';
 
 /**
  * Enhanced MCP Server with Mesh Network Capabilities
@@ -22,6 +23,58 @@ interface MeshSession {
   activeAgents: Map<string, { taskId: string; startTime: number; status: string }>;
   completedAgents: Map<string, AgentResult>;
   createdAt: number;
+}
+
+// Tool argument interfaces for type safety
+interface AnalyzeProblemArgs {
+  prompt: string;
+  workFolder?: string;
+  complexity?: 'simple' | 'moderate' | 'complex' | 'enterprise';
+}
+
+interface ExecuteTasksArgs {
+  tasks: Array<{
+    id: string;
+    prompt: string;
+    agentRole: 'analysis' | 'implementation' | 'testing' | 'documentation' | 'debugging';
+    workFolder?: string;
+    returnMode?: 'summary' | 'full';
+    dependencies?: string[];
+  }>;
+  maxConcurrent?: number;
+}
+
+interface SolveProblemArgs {
+  prompt: string;
+  workFolder?: string;
+  approach?: 'analysis_first' | 'parallel_exploration' | 'iterative_refinement';
+  agentCount?: number;
+  returnSummary?: boolean;
+}
+
+interface MeshPlanArgs {
+  prompt: string;
+  workFolder?: string;
+  approach?: 'quick' | 'balanced' | 'thorough';
+}
+
+interface SpawnAgentArgs {
+  taskId: string;
+  prompt: string;
+  agentRole: 'analysis' | 'implementation' | 'testing' | 'documentation' | 'debugging';
+  workFolder?: string;
+  sessionId?: string;
+  returnMode?: 'summary' | 'full';
+}
+
+interface AgentStatusArgs {
+  sessionId: string;
+  agentIds?: string[];
+}
+
+interface CollectResultArgs {
+  sessionId: string;
+  agentId: string;
 }
 
 class MeshEnhancedServer {
@@ -49,6 +102,44 @@ class MeshEnhancedServer {
 
     this.setupMeshToolHandlers();
     this.server.onerror = (error) => console.error('[Mesh Error]', error);
+
+    // Set up graceful shutdown handlers
+    this.setupShutdownHandlers();
+  }
+
+  /**
+   * Set up graceful shutdown handlers to clean up resources
+   */
+  private setupShutdownHandlers(): void {
+    const shutdown = async (signal: string) => {
+      console.error(`[MeshSeeks] Received ${signal}, shutting down gracefully...`);
+
+      // Stop the status board to clean up its interval
+      stopStatusBoard();
+
+      // Close the MCP server
+      try {
+        await this.server.close();
+        console.error('[MeshSeeks] Server closed successfully');
+      } catch (error) {
+        console.error('[MeshSeeks] Error closing server:', error);
+      }
+
+      process.exit(0);
+    };
+
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('uncaughtException', (error) => {
+      console.error('[MeshSeeks] Uncaught exception:', error);
+      stopStatusBoard();
+      process.exit(1);
+    });
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('[MeshSeeks] Unhandled rejection at:', promise, 'reason:', reason);
+      stopStatusBoard();
+      process.exit(1);
+    });
   }
 
   /**
@@ -293,18 +384,19 @@ class MeshEnhancedServer {
   /**
    * Handle problem analysis and task decomposition
    */
-  private async handleAnalyzeProblem(args: any): Promise<ServerResult> {
-    if (!args?.prompt) {
+  private async handleAnalyzeProblem(args: unknown): Promise<ServerResult> {
+    const typedArgs = args as AnalyzeProblemArgs | undefined;
+    if (!typedArgs?.prompt) {
       throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: prompt');
     }
 
     // Auto-detect working directory if not provided
-    const workFolder = args.workFolder || process.cwd();
+    const workFolder = typedArgs.workFolder || process.cwd();
     
     console.error(`[Mesh] Analyzing problem for task decomposition in: ${workFolder}`);
-    
+
     const tasks = await this.meshCoordinator.analyzeProblem(
-      args.prompt,
+      typedArgs.prompt,
       workFolder
     );
 
@@ -328,18 +420,19 @@ class MeshEnhancedServer {
   /**
    * Handle task execution across the mesh network
    */
-  private async handleExecuteTasks(args: any): Promise<ServerResult> {
-    if (!args?.tasks || !Array.isArray(args.tasks)) {
+  private async handleExecuteTasks(args: unknown): Promise<ServerResult> {
+    const typedArgs = args as ExecuteTasksArgs | undefined;
+    if (!typedArgs?.tasks || !Array.isArray(typedArgs.tasks)) {
       throw new McpError(ErrorCode.InvalidParams, 'Missing or invalid tasks array');
     }
 
-    const maxConcurrent = args.maxConcurrent || 5;
+    const maxConcurrent = typedArgs.maxConcurrent || 5;
     this.meshCoordinator = new MeshCoordinator('claude', maxConcurrent);
 
-    console.error(`[Mesh] Executing ${args.tasks.length} tasks with max ${maxConcurrent} concurrent agents...`);
-    
+    console.error(`[Mesh] Executing ${typedArgs.tasks.length} tasks with max ${maxConcurrent} concurrent agents...`);
+
     const startTime = Date.now();
-    const results = await this.meshCoordinator.executeMeshTasks(args.tasks);
+    const results = await this.meshCoordinator.executeMeshTasks(typedArgs.tasks as TaskRequest[]);
     const executionTime = Date.now() - startTime;
 
     const successCount = results.filter(r => r.success).length;
@@ -365,23 +458,24 @@ class MeshEnhancedServer {
   /**
    * Handle end-to-end problem solving
    */
-  private async handleSolveProblem(args: any): Promise<ServerResult> {
-    if (!args?.prompt) {
+  private async handleSolveProblem(args: unknown): Promise<ServerResult> {
+    const typedArgs = args as SolveProblemArgs | undefined;
+    if (!typedArgs?.prompt) {
       throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: prompt');
     }
 
     // Auto-detect working directory if not provided
-    const workFolder = args.workFolder || process.cwd();
-    const approach = args.approach || 'analysis_first';
-    const returnSummary = args.returnSummary || false;
+    const workFolder = typedArgs.workFolder || process.cwd();
+    const approach = typedArgs.approach || 'analysis_first';
+    const returnSummary = typedArgs.returnSummary || false;
 
     console.error(`[Mesh] Solving problem using ${approach} approach in: ${workFolder}`);
-    
+
     const startTime = Date.now();
 
     // Step 1: Analyze the problem
     console.error('[Mesh] Step 1: Problem analysis and decomposition...');
-    const tasks = await this.meshCoordinator.analyzeProblem(args.prompt, workFolder);
+    const tasks = await this.meshCoordinator.analyzeProblem(typedArgs.prompt, workFolder);
     console.error(`[Mesh] Generated ${tasks.length} specialized tasks for parallel execution`);
 
     // Step 2: Execute tasks based on approach
@@ -417,7 +511,7 @@ class MeshEnhancedServer {
 
     // Step 3: Synthesize results
     console.error('[Mesh] Step 3: Synthesizing results from all agents...');
-    const synthesis = await this.synthesizeResults(results, args.prompt, returnSummary);
+    const synthesis = await this.synthesizeResults(results, typedArgs.prompt, returnSummary);
 
     const response = {
       status: successCount === results.length ? 'success' : 'partial_success',
@@ -612,26 +706,27 @@ Estimated execution time: ~${estimatedTime} seconds with ${maxConcurrent} concur
   /**
    * Handle mesh_plan - Create execution plan without running
    */
-  private async handleMeshPlan(args: any): Promise<ServerResult> {
-    if (!args?.prompt) {
+  private async handleMeshPlan(args: unknown): Promise<ServerResult> {
+    const typedArgs = args as MeshPlanArgs | undefined;
+    if (!typedArgs?.prompt) {
       throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: prompt');
     }
 
-    const workFolder = args.workFolder || process.cwd();
-    const approach = args.approach || 'balanced';
+    const workFolder = typedArgs.workFolder || process.cwd();
+    const approach = typedArgs.approach || 'balanced';
     const sessionId = `mesh-session-${Date.now()}`;
-    
+
     // Create task plan based on approach
     let tasks: TaskRequest[];
     switch (approach) {
       case 'quick':
-        tasks = this.createQuickPlan(args.prompt, workFolder);
+        tasks = this.createQuickPlan(typedArgs.prompt, workFolder);
         break;
       case 'thorough':
-        tasks = this.createThoroughPlan(args.prompt, workFolder);
+        tasks = this.createThoroughPlan(typedArgs.prompt, workFolder);
         break;
       default:
-        tasks = this.createBalancedPlan(args.prompt, workFolder);
+        tasks = this.createBalancedPlan(typedArgs.prompt, workFolder);
     }
     
     // Store session
@@ -672,13 +767,14 @@ Estimated execution time: ~${estimatedTime} seconds with ${maxConcurrent} concur
   /**
    * Handle mesh_spawn_agent - Spawn individual agent
    */
-  private async handleSpawnAgent(args: any): Promise<ServerResult> {
-    if (!args?.taskId || !args?.prompt || !args?.agentRole) {
+  private async handleSpawnAgent(args: unknown): Promise<ServerResult> {
+    const typedArgs = args as SpawnAgentArgs | undefined;
+    if (!typedArgs?.taskId || !typedArgs?.prompt || !typedArgs?.agentRole) {
       throw new McpError(ErrorCode.InvalidParams, 'Missing required parameters');
     }
-    
-    const sessionId = args.sessionId || `standalone-${Date.now()}`;
-    const workFolder = args.workFolder || process.cwd();
+
+    const sessionId = typedArgs.sessionId || `standalone-${Date.now()}`;
+    const workFolder = typedArgs.workFolder || process.cwd();
     
     // Get or create session
     let session = this.sessions.get(sessionId);
@@ -694,18 +790,18 @@ Estimated execution time: ~${estimatedTime} seconds with ${maxConcurrent} concur
     }
     
     // Create agent ID
-    const agentId = `agent-${args.taskId}-${Date.now()}`;
-    
+    const agentId = `agent-${typedArgs.taskId}-${Date.now()}`;
+
     // Track agent
     session.activeAgents.set(agentId, {
-      taskId: args.taskId,
+      taskId: typedArgs.taskId,
       startTime: Date.now(),
       status: 'spawning'
     });
-    
+
     // Spawn agent asynchronously
-    this.spawnAgentAsync(agentId, args, workFolder, session);
-    
+    this.spawnAgentAsync(agentId, typedArgs, workFolder, session);
+
     // Return immediately
     const roleEmojis: Record<string, string> = {
       analysis: '🔍',
@@ -714,34 +810,34 @@ Estimated execution time: ~${estimatedTime} seconds with ${maxConcurrent} concur
       documentation: '📝',
       debugging: '🐛'
     };
-    
-    return { 
-      content: [{ 
-        type: 'text', 
+
+    return {
+      content: [{
+        type: 'text',
         text: JSON.stringify({
           agentId,
           sessionId,
           status: 'spawned',
-          message: `${roleEmojis[args.agentRole] || '🤖'} Launching ${args.agentRole} agent...`,
-          taskInfo: `Working on: "${args.taskId}"`,
+          message: `${roleEmojis[typedArgs.agentRole] || '🤖'} Launching ${typedArgs.agentRole} agent...`,
+          taskInfo: `Working on: "${typedArgs.taskId}"`,
           whatNext: `I'll check back in ~30 seconds to see progress`,
           ascii: `
     ╭─────────────────╮
     │ Agent Spawned!  │
     │    ┏━━━┓        │
-    │    ┃${roleEmojis[args.agentRole] || '🤖'}┃ <-- ${args.agentRole}
+    │    ┃${roleEmojis[typedArgs.agentRole] || '🤖'}┃ <-- ${typedArgs.agentRole}
     │    ┗━━━┛        │
     │  Status: 🟢     │
     ╰─────────────────╯`
-        }, null, 2) 
-      }] 
+        }, null, 2)
+      }]
     };
   }
   
   /**
    * Spawn agent asynchronously
    */
-  private async spawnAgentAsync(agentId: string, args: any, workFolder: string, session: MeshSession): Promise<void> {
+  private async spawnAgentAsync(agentId: string, args: SpawnAgentArgs, workFolder: string, session: MeshSession): Promise<void> {
     try {
       const task: TaskRequest = {
         id: args.taskId,
@@ -780,16 +876,17 @@ Estimated execution time: ~${estimatedTime} seconds with ${maxConcurrent} concur
   /**
    * Handle mesh_agent_status - Check agent status
    */
-  private async handleAgentStatus(args: any): Promise<ServerResult> {
-    if (!args?.sessionId) {
+  private async handleAgentStatus(args: unknown): Promise<ServerResult> {
+    const typedArgs = args as AgentStatusArgs | undefined;
+    if (!typedArgs?.sessionId) {
       throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: sessionId');
     }
-    
-    const session = this.sessions.get(args.sessionId);
+
+    const session = this.sessions.get(typedArgs.sessionId);
     if (!session) {
       throw new McpError(ErrorCode.InvalidParams, 'Invalid session ID');
     }
-    
+
     const now = Date.now();
     const activeAgents = Array.from(session.activeAgents.entries()).map(([id, info]) => ({
       id,
@@ -797,7 +894,7 @@ Estimated execution time: ~${estimatedTime} seconds with ${maxConcurrent} concur
       status: info.status,
       runningTime: Math.round((now - info.startTime) / 1000) + 's'
     }));
-    
+
     const completedAgents = Array.from(session.completedAgents.entries()).map(([id, result]) => ({
       id,
       taskId: result.taskId,
@@ -805,19 +902,19 @@ Estimated execution time: ~${estimatedTime} seconds with ${maxConcurrent} concur
       success: result.success,
       executionTime: Math.round(result.executionTime / 1000) + 's'
     }));
-    
+
     // Create visual progress bar
     const totalAgents = session.plan.length || (activeAgents.length + completedAgents.length);
     const progressPercent = totalAgents > 0 ? Math.round((completedAgents.length / totalAgents) * 100) : 0;
     const progressBar = '█'.repeat(Math.floor(progressPercent / 5)) + '░'.repeat(20 - Math.floor(progressPercent / 5));
-    
+
     // Create status messages
-    const statusMessages = activeAgents.map(agent => 
+    const statusMessages = activeAgents.map(agent =>
       `  ${agent.status === 'running' ? '⚡' : '⏳'} ${agent.taskId}: ${agent.status} (${agent.runningTime})`
     ).join('\n');
-    
+
     const response = {
-      sessionId: args.sessionId,
+      sessionId: typedArgs.sessionId,
       summary: {
         active: activeAgents.length,
         completed: completedAgents.length,
@@ -849,20 +946,21 @@ ${activeAgents.length > 0 ? '║  Currently running:                           �
   /**
    * Handle mesh_collect_result - Collect agent results
    */
-  private async handleCollectResult(args: any): Promise<ServerResult> {
-    if (!args?.sessionId || !args?.agentId) {
+  private async handleCollectResult(args: unknown): Promise<ServerResult> {
+    const typedArgs = args as CollectResultArgs | undefined;
+    if (!typedArgs?.sessionId || !typedArgs?.agentId) {
       throw new McpError(ErrorCode.InvalidParams, 'Missing required parameters');
     }
-    
-    const session = this.sessions.get(args.sessionId);
+
+    const session = this.sessions.get(typedArgs.sessionId);
     if (!session) {
       throw new McpError(ErrorCode.InvalidParams, 'Invalid session ID');
     }
-    
-    const result = session.completedAgents.get(args.agentId);
+
+    const result = session.completedAgents.get(typedArgs.agentId);
     if (!result) {
       // Check if still active
-      const stillActive = session.activeAgents.has(args.agentId);
+      const stillActive = session.activeAgents.has(typedArgs.agentId);
       
       return { 
         content: [{ 
@@ -892,11 +990,11 @@ ${activeAgents.length > 0 ? '║  Currently running:                           �
       debugging: '🐛'
     };
     
-    return { 
-      content: [{ 
-        type: 'text', 
+    return {
+      content: [{
+        type: 'text',
         text: JSON.stringify({
-          agentId: args.agentId,
+          agentId: typedArgs.agentId,
           taskId: result.taskId,
           role: result.role,
           success: result.success,

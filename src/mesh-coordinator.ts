@@ -429,7 +429,7 @@ You are a DEBUGGING AGENT specialized in:
         '-p', prompt
       ];
 
-      const process = spawn(this.claudeCodePath, args, {
+      const childProcess = spawn(this.claudeCodePath, args, {
         cwd: workFolder,
         stdio: ['ignore', 'pipe', 'pipe'],
         timeout: executionTimeoutMs
@@ -445,28 +445,28 @@ You are a DEBUGGING AGENT specialized in:
         heartbeatCounter++;
         const elapsedSeconds = Math.floor((Date.now() - executionStartTime) / 1000);
         const heartbeatMessage = `⏱️  ${role} agent still working... ${elapsedSeconds}s elapsed`;
-        
+
         // Report progress to status board
         this.statusBoard.addProgressUpdate(heartbeatMessage);
-        
+
         // Send periodic encouragement to Claude
         if (heartbeatCounter % 3 === 0) {
           console.error(`💪 ${role.toUpperCase()} agent is making progress... hang tight!`);
         }
       }, heartbeatIntervalMs);
 
-      process.stdout.on('data', (data) => {
+      childProcess.stdout.on('data', (data) => {
         stdout += data.toString();
       });
 
-      process.stderr.on('data', (data) => {
+      childProcess.stderr.on('data', (data) => {
         stderr += data.toString();
       });
 
-      process.on('close', (code) => {
+      childProcess.on('close', (code) => {
         clearInterval(progressReporter);
         const executionTimeMs = Date.now() - executionStartTime;
-        
+
         if (code === 0) {
           resolve(stdout);
         } else {
@@ -474,10 +474,10 @@ You are a DEBUGGING AGENT specialized in:
         }
       });
 
-      process.on('error', (error: NodeJS.ErrnoException) => {
+      childProcess.on('error', (error: NodeJS.ErrnoException) => {
         clearInterval(progressReporter);
         let errorMessage = `Failed to spawn Claude Code process: ${error.message}`;
-        
+
         // Add additional error context
         if (error.code === 'ETIMEDOUT') {
           errorMessage = `Claude Code execution timed out after ${executionTimeoutMs / 1000}s: ${error.message}`;
@@ -489,7 +489,7 @@ You are a DEBUGGING AGENT specialized in:
           errorMessage += ` | Syscall: ${error.syscall}`;
         }
         errorMessage += `\nStderr: ${stderr.trim()}`;
-        
+
         reject(new Error(errorMessage));
       });
     });
@@ -500,17 +500,24 @@ You are a DEBUGGING AGENT specialized in:
    */
   private extractTasksFromResponse(response: string): any[] {
     // Try to extract JSON from Claude's response
-    const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) || 
+    const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) ||
                      response.match(/\[[\s\S]*\]/);
-    
+
     if (jsonMatch) {
+      const jsonContent = jsonMatch[1] || jsonMatch[0];
       try {
-        return JSON.parse(jsonMatch[1] || jsonMatch[0]);
-      } catch {
-        // Fall through to default
+        return JSON.parse(jsonContent);
+      } catch (error) {
+        // Log the parsing error with context for debugging
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const preview = jsonContent.substring(0, 200);
+        this.statusBoard.showWarning(
+          `Failed to parse task JSON: ${errorMessage}. Preview: "${preview}..."`
+        );
+        // Fall through to return empty array
       }
     }
-    
+
     return [];
   }
 

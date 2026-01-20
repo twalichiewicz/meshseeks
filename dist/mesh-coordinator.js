@@ -336,7 +336,7 @@ You are a DEBUGGING AGENT specialized in:
                 '--dangerously-skip-permissions',
                 '-p', prompt
             ];
-            const process = spawn(this.claudeCodePath, args, {
+            const childProcess = spawn(this.claudeCodePath, args, {
                 cwd: workFolder,
                 stdio: ['ignore', 'pipe', 'pipe'],
                 timeout: executionTimeoutMs
@@ -357,13 +357,13 @@ You are a DEBUGGING AGENT specialized in:
                     console.error(`💪 ${role.toUpperCase()} agent is making progress... hang tight!`);
                 }
             }, heartbeatIntervalMs);
-            process.stdout.on('data', (data) => {
+            childProcess.stdout.on('data', (data) => {
                 stdout += data.toString();
             });
-            process.stderr.on('data', (data) => {
+            childProcess.stderr.on('data', (data) => {
                 stderr += data.toString();
             });
-            process.on('close', (code) => {
+            childProcess.on('close', (code) => {
                 clearInterval(progressReporter);
                 const executionTimeMs = Date.now() - executionStartTime;
                 if (code === 0) {
@@ -373,7 +373,7 @@ You are a DEBUGGING AGENT specialized in:
                     reject(new Error(`Claude Code execution failed with exit code ${code}\nStderr: ${stderr}\nStdout: ${stdout}`));
                 }
             });
-            process.on('error', (error) => {
+            childProcess.on('error', (error) => {
                 clearInterval(progressReporter);
                 let errorMessage = `Failed to spawn Claude Code process: ${error.message}`;
                 // Add additional error context
@@ -399,11 +399,16 @@ You are a DEBUGGING AGENT specialized in:
         const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) ||
             response.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
+            const jsonContent = jsonMatch[1] || jsonMatch[0];
             try {
-                return JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                return JSON.parse(jsonContent);
             }
-            catch {
-                // Fall through to default
+            catch (error) {
+                // Log the parsing error with context for debugging
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const preview = jsonContent.substring(0, 200);
+                this.statusBoard.showWarning(`Failed to parse task JSON: ${errorMessage}. Preview: "${preview}..."`);
+                // Fall through to return empty array
             }
         }
         return [];
