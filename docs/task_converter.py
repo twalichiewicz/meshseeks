@@ -11,7 +11,7 @@ a JSON list of tasks that can be directly consumed by the Claude Code MCP server
 ### Claude Code MCP Integration ###
 
 The output from this converter is specifically designed to work with the Claude Code MCP
-server described in: https://github.com/grahama1970/claude-code-mcp/
+server described in: https://github.com/twalichiewicz/meshseeks
 
 The MCP (Model Context Protocol) is a standardized way for AI models to interact with
 external tools and services. This converter generates prompts that are formatted
