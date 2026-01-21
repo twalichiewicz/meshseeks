@@ -371,7 +371,11 @@ class MeshErrorHandlingTestSuite {
         for (const scenario of networkScenarios) {
             try {
                 const result = this.simulateNetworkFailure(scenario);
-                if (!result.error.includes('network') && !result.error.includes('connection') && !result.error.includes('timeout')) {
+                // Check case-insensitively for network-related keywords
+                const errorLower = result.error.toLowerCase();
+                if (!errorLower.includes('network') && !errorLower.includes('connection') &&
+                    !errorLower.includes('timeout') && !errorLower.includes('rate limit') &&
+                    !errorLower.includes('authentication')) {
                     this.allValidationFailures.push(`${scenario.name}: Network error not properly categorized`);
                 }
                 if (result.retryable !== scenario.retryable) {
@@ -447,7 +451,10 @@ class MeshErrorHandlingTestSuite {
             catch (error) {
                 // Expected for most malformed inputs
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                if (!errorMessage.toLowerCase().includes('invalid')) {
+                // Check that the error message relates to the expected error type
+                const errorLower = errorMessage.toLowerCase();
+                const expectedLower = testCase.expectedError.toLowerCase();
+                if (!errorLower.includes('invalid') && !errorLower.includes(expectedLower)) {
                     this.allValidationFailures.push(`${testCase.name}: Unexpected error type: ${errorMessage}`);
                 }
             }

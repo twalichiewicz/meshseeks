@@ -10,6 +10,19 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import MeshCoordinator, { type TaskRequest, type AgentResult } from './mesh-coordinator.js';
 import { stopStatusBoard } from './status-board-stderr.js';
+import { SwarmOrchestrator } from './swarm/swarm-orchestrator.js';
+import type {
+  CreateSessionArgs,
+  ResumeSessionArgs,
+  PauseSessionArgs,
+  SessionStatusArgs,
+  PlanHierarchicalArgs,
+  VerifyTaskArgs,
+  ScaleAgentsArgs,
+  CreateCheckpointArgs,
+  ListCheckpointsArgs,
+  RestoreCheckpointArgs
+} from './types/swarm-types.js';
 
 /**
  * Enhanced MCP Server with Mesh Network Capabilities
@@ -81,12 +94,15 @@ class MeshEnhancedServer {
   private server: Server;
   private meshCoordinator: MeshCoordinator;
   private sessions: Map<string, MeshSession> = new Map();
+  private swarmOrchestrator: SwarmOrchestrator;
+  private swarmInitialized: boolean = false;
 
   constructor() {
     // Debug: Log to stderr on startup
     console.error('[MeshSeeks] Server starting with stderr status board v1.1...');
-    
+
     this.meshCoordinator = new MeshCoordinator();
+    this.swarmOrchestrator = new SwarmOrchestrator();
     
     this.server = new Server(
       {
@@ -326,6 +342,153 @@ class MeshEnhancedServer {
             required: ['sessionId', 'agentId'],
           },
         },
+        // =================================================================
+        // SWARM TOOLS - Cursor-scale operations (100+ agents)
+        // =================================================================
+        {
+          name: 'mesh_swarm_create_session',
+          description: 'Create a new autonomous swarm session for complex, multi-day operations. Supports 100+ concurrent agents, hierarchical task decomposition, and automatic checkpointing.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Session name for identification' },
+              description: { type: 'string', description: 'Optional description of the session goal' },
+              prompt: { type: 'string', description: 'The complex problem to solve autonomously' },
+              workFolder: { type: 'string', description: 'Working directory for the session' },
+              config: {
+                type: 'object',
+                description: 'Optional configuration overrides',
+                properties: {
+                  maxConcurrentAgents: { type: 'number', description: 'Max concurrent agents (1-500)' },
+                  maxTaskDepth: { type: 'number', description: 'Max task hierarchy depth (1-5)' },
+                  enableJudge: { type: 'boolean', description: 'Enable automated verification' }
+                }
+              }
+            },
+            required: ['name', 'prompt', 'workFolder'],
+          },
+        },
+        {
+          name: 'mesh_swarm_resume_session',
+          description: 'Resume a paused or failed swarm session from its last checkpoint or a specific checkpoint.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session ID to resume' },
+              checkpointId: { type: 'string', description: 'Optional checkpoint ID to restore from' },
+              resetFailedTasks: { type: 'boolean', description: 'Reset failed tasks to pending (default: false)' }
+            },
+            required: ['sessionId'],
+          },
+        },
+        {
+          name: 'mesh_swarm_pause_session',
+          description: 'Gracefully pause a running swarm session, creating a checkpoint for later resumption.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session ID to pause' },
+              reason: { type: 'string', description: 'Optional reason for pausing' }
+            },
+            required: ['sessionId'],
+          },
+        },
+        {
+          name: 'mesh_swarm_session_status',
+          description: 'Get detailed status and metrics for a swarm session including progress, agent states, and task breakdown.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session ID to query' },
+              includeTaskDetails: { type: 'boolean', description: 'Include detailed task information' },
+              includeAgentDetails: { type: 'boolean', description: 'Include detailed agent information' }
+            },
+            required: ['sessionId'],
+          },
+        },
+        {
+          name: 'mesh_swarm_plan_hierarchical',
+          description: 'Perform multi-level task decomposition for a swarm session. Creates hierarchical task tree with dependencies.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session ID' },
+              taskId: { type: 'string', description: 'Parent task to decompose (root if not provided)' },
+              maxDepth: { type: 'number', description: 'Maximum decomposition depth (1-5)' },
+              maxTasksPerLevel: { type: 'number', description: 'Maximum tasks per level (default: 100)' }
+            },
+            required: ['sessionId'],
+          },
+        },
+        {
+          name: 'mesh_swarm_verify_task',
+          description: 'Trigger judge verification for a completed task. Returns verdict with pass/fail, confidence, and rework instructions if needed.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session ID' },
+              taskId: { type: 'string', description: 'Task ID to verify' },
+              criteria: {
+                type: 'array',
+                items: { type: 'string', enum: ['completeness', 'correctness', 'quality', 'testing', 'documentation', 'security', 'performance'] },
+                description: 'Specific criteria to evaluate (default: role-based)'
+              },
+              customPrompt: { type: 'string', description: 'Custom verification prompt' }
+            },
+            required: ['sessionId', 'taskId'],
+          },
+        },
+        {
+          name: 'mesh_swarm_scale_agents',
+          description: 'Dynamically adjust the agent pool size for a running session.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session ID' },
+              targetCount: { type: 'number', description: 'Target number of agents (1-500)' },
+              reason: { type: 'string', description: 'Reason for scaling' }
+            },
+            required: ['sessionId', 'targetCount'],
+          },
+        },
+        {
+          name: 'mesh_swarm_create_checkpoint',
+          description: 'Manually create a checkpoint for a swarm session. Use for milestones or before risky operations.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session ID' },
+              description: { type: 'string', description: 'Checkpoint description' }
+            },
+            required: ['sessionId'],
+          },
+        },
+        {
+          name: 'mesh_swarm_list_checkpoints',
+          description: 'List all checkpoints for a swarm session with timestamps and descriptions.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session ID' },
+              limit: { type: 'number', description: 'Maximum checkpoints to return' },
+              offset: { type: 'number', description: 'Offset for pagination' }
+            },
+            required: ['sessionId'],
+          },
+        },
+        {
+          name: 'mesh_swarm_restore_checkpoint',
+          description: 'Restore a swarm session to a specific checkpoint state.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session ID' },
+              checkpointId: { type: 'string', description: 'Checkpoint ID to restore' },
+              resetFailedTasks: { type: 'boolean', description: 'Reset failed tasks to pending' }
+            },
+            required: ['sessionId', 'checkpointId'],
+          },
+        },
       ],
     }));
 
@@ -370,7 +533,38 @@ class MeshEnhancedServer {
           case 'mesh_collect_result':
           case 'collect_result':
             return await this.handleCollectResult(toolArguments);
-          
+
+          // Swarm tools
+          case 'mesh_swarm_create_session':
+            return await this.handleSwarmCreateSession(toolArguments);
+
+          case 'mesh_swarm_resume_session':
+            return await this.handleSwarmResumeSession(toolArguments);
+
+          case 'mesh_swarm_pause_session':
+            return await this.handleSwarmPauseSession(toolArguments);
+
+          case 'mesh_swarm_session_status':
+            return await this.handleSwarmSessionStatus(toolArguments);
+
+          case 'mesh_swarm_plan_hierarchical':
+            return await this.handleSwarmPlanHierarchical(toolArguments);
+
+          case 'mesh_swarm_verify_task':
+            return await this.handleSwarmVerifyTask(toolArguments);
+
+          case 'mesh_swarm_scale_agents':
+            return await this.handleSwarmScaleAgents(toolArguments);
+
+          case 'mesh_swarm_create_checkpoint':
+            return await this.handleSwarmCreateCheckpoint(toolArguments);
+
+          case 'mesh_swarm_list_checkpoints':
+            return await this.handleSwarmListCheckpoints(toolArguments);
+
+          case 'mesh_swarm_restore_checkpoint':
+            return await this.handleSwarmRestoreCheckpoint(toolArguments);
+
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Mesh tool ${toolName} not found`);
         }
@@ -1059,6 +1253,381 @@ ${activeAgents.length > 0 ? 'â•‘  Currently running:                           â
       // ... add more tasks
     ];
     return plan;
+  }
+
+  // ===========================================================================
+  // SWARM HANDLERS
+  // ===========================================================================
+
+  /**
+   * Ensure swarm orchestrator is initialized.
+   */
+  private async ensureSwarmInitialized(): Promise<void> {
+    if (!this.swarmInitialized) {
+      await this.swarmOrchestrator.initialize();
+      this.swarmInitialized = true;
+    }
+  }
+
+  /**
+   * Handle mesh_swarm_create_session.
+   */
+  private async handleSwarmCreateSession(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as CreateSessionArgs | undefined;
+    if (!typedArgs?.name || !typedArgs?.prompt || !typedArgs?.workFolder) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameters: name, prompt, workFolder');
+    }
+
+    console.error(`[Swarm] Creating session: ${typedArgs.name}`);
+
+    const session = await this.swarmOrchestrator.createSession({
+      name: typedArgs.name,
+      description: typedArgs.description,
+      prompt: typedArgs.prompt,
+      workFolder: typedArgs.workFolder,
+      config: typedArgs.config
+    });
+
+    const response = {
+      status: 'success',
+      operation: 'swarm_create_session',
+      sessionId: session.id,
+      name: session.name,
+      rootTaskId: session.rootTaskId,
+      nextSteps: [
+        `Session created with ID: ${session.id}`,
+        'Use mesh_swarm_plan_hierarchical to decompose the problem',
+        'Use mesh_swarm_session_status to monitor progress',
+        'Session will checkpoint automatically every 5 minutes'
+      ]
+    };
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+  }
+
+  /**
+   * Handle mesh_swarm_resume_session.
+   */
+  private async handleSwarmResumeSession(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as ResumeSessionArgs | undefined;
+    if (!typedArgs?.sessionId) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: sessionId');
+    }
+
+    console.error(`[Swarm] Resuming session: ${typedArgs.sessionId}`);
+
+    const session = await this.swarmOrchestrator.resumeSession(
+      typedArgs.sessionId,
+      typedArgs.checkpointId,
+      typedArgs.resetFailedTasks
+    );
+
+    const response = {
+      status: 'success',
+      operation: 'swarm_resume_session',
+      sessionId: session.id,
+      sessionStatus: session.status,
+      metrics: session.metrics
+    };
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+  }
+
+  /**
+   * Handle mesh_swarm_pause_session.
+   */
+  private async handleSwarmPauseSession(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as PauseSessionArgs | undefined;
+    if (!typedArgs?.sessionId) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: sessionId');
+    }
+
+    console.error(`[Swarm] Pausing session: ${typedArgs.sessionId}`);
+
+    const session = await this.swarmOrchestrator.pauseSession(
+      typedArgs.sessionId,
+      typedArgs.reason
+    );
+
+    const response = {
+      status: 'success',
+      operation: 'swarm_pause_session',
+      sessionId: session.id,
+      sessionStatus: session.status,
+      lastCheckpointId: session.lastCheckpointId
+    };
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+  }
+
+  /**
+   * Handle mesh_swarm_session_status.
+   */
+  private async handleSwarmSessionStatus(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as SessionStatusArgs | undefined;
+    if (!typedArgs?.sessionId) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: sessionId');
+    }
+
+    const status = this.swarmOrchestrator.getSessionStatus(typedArgs.sessionId);
+    const session = await this.swarmOrchestrator.getSession(typedArgs.sessionId);
+    const poolStats = this.swarmOrchestrator.getPoolStats();
+
+    const response: Record<string, unknown> = {
+      status: 'success',
+      operation: 'swarm_session_status',
+      sessionId: typedArgs.sessionId,
+      sessionStatus: status.status,
+      progress: `${status.progress.toFixed(1)}%`,
+      metrics: status.metrics,
+      poolStats: {
+        totalAgents: poolStats.totalAgents,
+        busyAgents: poolStats.busyAgents,
+        health: poolStats.health,
+        utilization: `${poolStats.utilizationPercent.toFixed(1)}%`
+      }
+    };
+
+    if (typedArgs.includeTaskDetails && session) {
+      const taskTree = session.taskTree instanceof Map
+        ? Object.fromEntries(session.taskTree)
+        : session.taskTree;
+      response.taskTree = taskTree;
+    }
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+  }
+
+  /**
+   * Handle mesh_swarm_plan_hierarchical.
+   */
+  private async handleSwarmPlanHierarchical(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as PlanHierarchicalArgs | undefined;
+    if (!typedArgs?.sessionId) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: sessionId');
+    }
+
+    console.error(`[Swarm] Planning hierarchical tasks for session: ${typedArgs.sessionId}`);
+
+    const session = await this.swarmOrchestrator.getSession(typedArgs.sessionId);
+    if (!session) {
+      throw new McpError(ErrorCode.InvalidParams, `Session not found: ${typedArgs.sessionId}`);
+    }
+
+    // Get the task to decompose
+    const taskId = typedArgs.taskId || session.rootTaskId;
+    const taskTree = session.taskTree instanceof Map
+      ? session.taskTree
+      : new Map(Object.entries(session.taskTree));
+    const task = taskTree.get(taskId);
+
+    if (!task) {
+      throw new McpError(ErrorCode.InvalidParams, `Task not found: ${taskId}`);
+    }
+
+    // Plan using the orchestrator
+    const newTasks = await this.swarmOrchestrator['planner'].decompose(task, {
+      sessionId: session.id,
+      workFolder: task.workFolder,
+      maxDepth: typedArgs.maxDepth || 5,
+      maxTasksPerLevel: typedArgs.maxTasksPerLevel || 100,
+      existingTaskIds: new Set(taskTree.keys())
+    });
+
+    const response = {
+      status: 'success',
+      operation: 'swarm_plan_hierarchical',
+      sessionId: typedArgs.sessionId,
+      parentTaskId: taskId,
+      tasksCreated: newTasks.tasks.length,
+      maxDepthReached: newTasks.maxDepthReached,
+      tasks: newTasks.tasks.map(t => ({
+        id: t.id,
+        role: t.role,
+        depth: t.depth,
+        dependencies: t.dependencies
+      }))
+    };
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+  }
+
+  /**
+   * Handle mesh_swarm_verify_task.
+   */
+  private async handleSwarmVerifyTask(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as VerifyTaskArgs | undefined;
+    if (!typedArgs?.sessionId || !typedArgs?.taskId) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameters: sessionId, taskId');
+    }
+
+    console.error(`[Swarm] Verifying task: ${typedArgs.taskId}`);
+
+    const session = await this.swarmOrchestrator.getSession(typedArgs.sessionId);
+    if (!session) {
+      throw new McpError(ErrorCode.InvalidParams, `Session not found: ${typedArgs.sessionId}`);
+    }
+
+    const taskTree = session.taskTree instanceof Map
+      ? session.taskTree
+      : new Map(Object.entries(session.taskTree));
+    const task = taskTree.get(typedArgs.taskId);
+
+    if (!task) {
+      throw new McpError(ErrorCode.InvalidParams, `Task not found: ${typedArgs.taskId}`);
+    }
+
+    if (!task.result) {
+      throw new McpError(ErrorCode.InvalidParams, 'Task has no result to verify');
+    }
+
+    const verdict = await this.swarmOrchestrator.verifyTask(task, task.result);
+
+    const response = {
+      status: 'success',
+      operation: 'swarm_verify_task',
+      taskId: typedArgs.taskId,
+      verdict: {
+        passed: verdict.passed,
+        overallScore: verdict.overallScore,
+        confidence: verdict.confidence,
+        requiresRework: verdict.requiresRework,
+        criteria: verdict.criteria.map(c => ({
+          type: c.type,
+          passed: c.passed,
+          score: c.score,
+          feedback: c.feedback
+        }))
+      }
+    };
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+  }
+
+  /**
+   * Handle mesh_swarm_scale_agents.
+   */
+  private async handleSwarmScaleAgents(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as ScaleAgentsArgs | undefined;
+    if (!typedArgs?.sessionId || typeof typedArgs?.targetCount !== 'number') {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameters: sessionId, targetCount');
+    }
+
+    console.error(`[Swarm] Scaling agents to ${typedArgs.targetCount}`);
+
+    await this.swarmOrchestrator.scaleAgents(typedArgs.targetCount, typedArgs.reason);
+    const stats = this.swarmOrchestrator.getPoolStats();
+
+    const response = {
+      status: 'success',
+      operation: 'swarm_scale_agents',
+      targetCount: typedArgs.targetCount,
+      currentCount: stats.totalAgents,
+      health: stats.health,
+      utilization: `${stats.utilizationPercent.toFixed(1)}%`
+    };
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+  }
+
+  /**
+   * Handle mesh_swarm_create_checkpoint.
+   */
+  private async handleSwarmCreateCheckpoint(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as CreateCheckpointArgs | undefined;
+    if (!typedArgs?.sessionId) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: sessionId');
+    }
+
+    console.error(`[Swarm] Creating checkpoint for session: ${typedArgs.sessionId}`);
+
+    const checkpointId = await this.swarmOrchestrator.createCheckpoint(
+      typedArgs.sessionId,
+      typedArgs.description
+    );
+
+    const response = {
+      status: 'success',
+      operation: 'swarm_create_checkpoint',
+      sessionId: typedArgs.sessionId,
+      checkpointId,
+      description: typedArgs.description || 'Manual checkpoint'
+    };
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+  }
+
+  /**
+   * Handle mesh_swarm_list_checkpoints.
+   */
+  private async handleSwarmListCheckpoints(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as ListCheckpointsArgs | undefined;
+    if (!typedArgs?.sessionId) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameter: sessionId');
+    }
+
+    const checkpoints = await this.swarmOrchestrator.listCheckpoints(typedArgs.sessionId);
+
+    const response = {
+      status: 'success',
+      operation: 'swarm_list_checkpoints',
+      sessionId: typedArgs.sessionId,
+      checkpointCount: checkpoints.length,
+      checkpoints: checkpoints.map(c => ({
+        id: c.id,
+        timestamp: new Date(c.timestamp).toISOString()
+      }))
+    };
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
+  }
+
+  /**
+   * Handle mesh_swarm_restore_checkpoint.
+   */
+  private async handleSwarmRestoreCheckpoint(args: unknown): Promise<ServerResult> {
+    await this.ensureSwarmInitialized();
+
+    const typedArgs = args as RestoreCheckpointArgs | undefined;
+    if (!typedArgs?.sessionId || !typedArgs?.checkpointId) {
+      throw new McpError(ErrorCode.InvalidParams, 'Missing required parameters: sessionId, checkpointId');
+    }
+
+    console.error(`[Swarm] Restoring checkpoint: ${typedArgs.checkpointId}`);
+
+    const session = await this.swarmOrchestrator.restoreCheckpoint(
+      typedArgs.sessionId,
+      typedArgs.checkpointId
+    );
+
+    const response = {
+      status: 'success',
+      operation: 'swarm_restore_checkpoint',
+      sessionId: session.id,
+      checkpointId: typedArgs.checkpointId,
+      sessionStatus: session.status,
+      metrics: session.metrics
+    };
+
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
   }
 
   /**

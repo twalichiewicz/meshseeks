@@ -27,27 +27,29 @@ src/tests/
 
 ### Run All Tests
 ```bash
-# Run complete test suite
-npm run test:mesh
+# Run complete test suite (recommended)
+npm run test:all
 
-# Or directly with Node.js
-node src/tests/run-all-tests.js
+# Or run with npm run test:mesh
+npm run test:mesh
 ```
 
 ### Run Individual Test Suites
 ```bash
 # Unit tests only
-node src/tests/mesh-coordinator.test.js
+npm run test:unit
 
-# Integration tests only  
-node src/tests/mesh-server.integration.test.js
+# Integration tests only
+npm run test:integration
 
 # Error handling tests only
-node src/tests/mesh-error-handling.test.js
+npm run test:errors
 
 # Performance tests only
-node src/tests/mesh-performance.test.js
+npm run test:performance
 ```
+
+> **Note:** Tests are TypeScript files that get compiled to `dist/tests/`. The npm scripts handle compilation and execution automatically.
 
 ## Test Categories
 
@@ -301,10 +303,10 @@ async runNewTests(): Promise<TestSuiteResult> {
 ### Debug Mode
 ```bash
 # Run with verbose output
-DEBUG=1 node src/tests/run-all-tests.js
+DEBUG=1 npm run test:all
 
 # Run specific test with detailed logging
-node src/tests/mesh-coordinator.test.js --verbose
+DEBUG=1 npm run test:unit
 ```
 
 ## Contributing

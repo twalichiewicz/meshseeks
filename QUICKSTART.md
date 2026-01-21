@@ -1,6 +1,6 @@
-# 🚀 Claude Code MCP Enhanced - Quick Start Guide
+# 🚀 MeshSeeks - Quick Start Guide
 
-Get up and running with Claude Code MCP Enhanced in under 5 minutes!
+Get up and running with MeshSeeks in under 5 minutes!
 
 ## Prerequisites
 
@@ -8,16 +8,23 @@ Get up and running with Claude Code MCP Enhanced in under 5 minutes!
 2. Claude CLI installed and configured ([install guide](https://claude.ai/cli))
 3. Claude Desktop or another MCP-compatible client
 
-## 🎯 Fastest Setup (GitHub URL)
+## 🎯 Fastest Setup
 
-1. **Add to your MCP configuration file:**
+1. **Clone and build:**
+   ```bash
+   git clone https://github.com/twalichiewicz/meshseeks.git
+   cd meshseeks
+   npm install && npm run build
+   ```
+
+2. **Add to your MCP configuration file:**
 
    ```json
    {
      "mcpServers": {
-       "claude-code-mcp-enhanced": {
-         "command": "npx",
-         "args": ["github:grahama1970/claude-code-mcp-enhanced"],
+       "meshseeks": {
+         "command": "node",
+         "args": ["/path/to/meshseeks/dist/mesh-server.js"],
          "env": {
            "MCP_CLAUDE_DEBUG": "false"
          }
@@ -25,6 +32,7 @@ Get up and running with Claude Code MCP Enhanced in under 5 minutes!
      }
    }
    ```
+   > Replace `/path/to/meshseeks` with the actual path where you cloned the repo
 
 2. **Save the file to the correct location:**
    - Claude Desktop: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
@@ -160,7 +168,7 @@ Use convert_task_markdown to convert my tasks.md file to MCP commands
 
 ## 🆘 Need Help?
 
-- [GitHub Issues](https://github.com/grahama1970/claude-code-mcp-enhanced/issues)
+- [GitHub Issues](https://github.com/twalichiewicz/meshseeks/issues)
 - [Full Documentation](README.md)
 - [Troubleshooting Guide](README.md#-troubleshooting)
 

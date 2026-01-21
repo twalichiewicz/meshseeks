@@ -14,10 +14,16 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+import { EventEmitter } from 'node:events';
 import { getStatusBoard } from './status-board-stderr.js';
+import type { SwarmOrchestrator } from './swarm/swarm-orchestrator.js';
+import type { HierarchicalTask, ExtendedAgentRole, SwarmSession, SwarmConfig } from './types/swarm-types.js';
 
-// Agent specialization types
+// Agent specialization types (basic roles)
 export type AgentRole = 'analysis' | 'implementation' | 'testing' | 'documentation' | 'debugging';
+
+// Extended roles include planner, judge, synthesizer, monitor for swarm mode
+export type FullAgentRole = AgentRole | 'planner' | 'judge' | 'synthesizer' | 'monitor';
 
 export interface AgentConfig {
   id: string;
@@ -50,11 +56,14 @@ export interface AgentResult {
 
 /**
  * Mesh Network Coordinator
- * 
+ *
  * Manages a network of specialized Claude Code agents working in parallel
  * on different aspects of complex coding problems.
+ *
+ * For large-scale operations (6+ agents, hierarchical tasks, week-long sessions),
+ * can optionally delegate to SwarmOrchestrator.
  */
-export class MeshCoordinator {
+export class MeshCoordinator extends EventEmitter {
   private activeAgents: Map<string, AgentConfig> = new Map();
   private completedTasks: Map<string, AgentResult> = new Map();
   private pendingTasks: Map<string, TaskRequest> = new Map();
@@ -62,13 +71,146 @@ export class MeshCoordinator {
   private statusBoard = getStatusBoard();
   private meshId: string;
 
+  // Optional SwarmOrchestrator for scale operations
+  private swarmOrchestrator?: SwarmOrchestrator;
+  private swarmThreshold: number = 6; // Delegate to swarm when > this many concurrent agents
+
   constructor(
     private claudeCodePath: string = 'claude',
     private maxConcurrentAgents: number = 5,
     private defaultTimeoutMs: number = parseInt(process.env.MCP_EXECUTION_TIMEOUT_MS || '1800000', 10)
   ) {
+    super();
     this.meshId = `mesh-${randomUUID().substring(0, 8)}`;
     this.statusBoard.addProgressUpdate(`MeshCoordinator initialized (${this.meshId}) with ${this.defaultTimeoutMs / 1000}s timeout`);
+  }
+
+  /**
+   * Connect a SwarmOrchestrator for scale operations.
+   * When connected, large tasks can be delegated to the swarm system.
+   */
+  connectSwarmOrchestrator(orchestrator: SwarmOrchestrator): void {
+    this.swarmOrchestrator = orchestrator;
+    this.statusBoard.addProgressUpdate('SwarmOrchestrator connected for scale operations');
+
+    // Forward orchestrator events
+    orchestrator.on('sessionStarted', (session: SwarmSession) => {
+      this.emit('swarm:sessionStarted', session);
+      this.statusBoard.addProgressUpdate(`Swarm session started: ${session.id}`);
+    });
+
+    orchestrator.on('sessionCompleted', (session: SwarmSession) => {
+      this.emit('swarm:sessionCompleted', session);
+      this.statusBoard.showSuccess(`Swarm session completed: ${session.id}`);
+    });
+
+    orchestrator.on('taskCompleted', (task: HierarchicalTask) => {
+      this.emit('swarm:taskCompleted', task);
+    });
+
+    orchestrator.on('checkpoint', (checkpointId: string) => {
+      this.emit('swarm:checkpoint', checkpointId);
+      this.statusBoard.addProgressUpdate(`Swarm checkpoint: ${checkpointId}`);
+    });
+  }
+
+  /**
+   * Check if swarm mode is available.
+   */
+  isSwarmAvailable(): boolean {
+    return this.swarmOrchestrator !== undefined;
+  }
+
+  /**
+   * Get the connected SwarmOrchestrator (if any).
+   */
+  getSwarmOrchestrator(): SwarmOrchestrator | undefined {
+    return this.swarmOrchestrator;
+  }
+
+  /**
+   * Set the threshold for delegating to swarm mode.
+   * Tasks requiring more than this many concurrent agents will use SwarmOrchestrator.
+   */
+  setSwarmThreshold(threshold: number): void {
+    this.swarmThreshold = threshold;
+  }
+
+  /**
+   * Execute a complex problem using swarm mode (hierarchical planning + 100+ agents).
+   * Requires SwarmOrchestrator to be connected.
+   */
+  async executeWithSwarm(
+    prompt: string,
+    workFolder: string,
+    config?: Partial<SwarmConfig>
+  ): Promise<SwarmSession> {
+    if (!this.swarmOrchestrator) {
+      throw new Error('SwarmOrchestrator not connected. Call connectSwarmOrchestrator first.');
+    }
+
+    this.statusBoard.addProgressUpdate(`Starting swarm execution for: ${prompt.substring(0, 50)}...`);
+
+    // Create swarm session with hierarchical planning
+    // Note: SwarmOrchestrator always uses hierarchical planning via HierarchicalPlanner
+    const session = await this.swarmOrchestrator.createSession({
+      name: `mesh-swarm-${Date.now()}`,
+      description: `MeshCoordinator delegated task`,
+      prompt: prompt,
+      workFolder: workFolder,
+      config: {
+        enableJudge: true,
+        ...config
+      }
+    });
+
+    // Run the session (non-blocking, runs in background)
+    // We don't await this - let it run in the background
+    this.swarmOrchestrator.run(session.id).catch(error => {
+      this.statusBoard.showError(`Swarm session ${session.id} failed: ${error}`);
+    });
+
+    return session;
+  }
+
+  /**
+   * Determine if a set of tasks should use swarm mode.
+   */
+  shouldUseSwarmMode(tasks: TaskRequest[]): boolean {
+    if (!this.swarmOrchestrator) return false;
+
+    // Use swarm mode if:
+    // 1. More tasks than the threshold
+    // 2. Task complexity suggests hierarchical decomposition needed
+    // 3. Explicit swarm request (future: add metadata to TaskRequest)
+
+    return tasks.length > this.swarmThreshold;
+  }
+
+  /**
+   * Delegate tasks to swarm orchestrator if appropriate.
+   * Returns true if delegated, false if handled locally.
+   */
+  async maybeDelegateToSwarm(tasks: TaskRequest[], workFolder: string): Promise<boolean> {
+    if (!this.shouldUseSwarmMode(tasks)) {
+      return false;
+    }
+
+    this.statusBoard.addProgressUpdate(
+      `Task count (${tasks.length}) exceeds threshold (${this.swarmThreshold}), delegating to swarm`
+    );
+
+    // Convert TaskRequests to a combined prompt for hierarchical planning
+    const combinedPrompt = tasks.map(t =>
+      `[${t.agentRole}] ${t.prompt}`
+    ).join('\n\n');
+
+    await this.executeWithSwarm(combinedPrompt, workFolder, {
+      maxConcurrentAgents: Math.min(tasks.length * 2, 100),
+      maxTaskDepth: 3
+    });
+
+    return true;
   }
 
   /**
@@ -363,8 +505,8 @@ Begin your specialized ${agent.role} work now:
   /**
    * Get role-specific instructions for specialized agents
    */
-  private getRoleInstructions(role: AgentRole): string {
-    const instructions = {
+  private getRoleInstructions(role: AgentRole | FullAgentRole): string {
+    const instructions: Record<string, string> = {
       analysis: `
 You are a CODE ANALYSIS AGENT specialized in:
 - Understanding existing codebases and architecture
@@ -399,6 +541,39 @@ You are a DEBUGGING AGENT specialized in:
 - Reproducing bugs and error conditions
 - Implementing fixes and patches
 - Preventing similar issues in the future
+`,
+      // Extended roles for swarm mode
+      planner: `
+You are a PLANNER AGENT specialized in:
+- Breaking down complex problems into manageable subtasks
+- Creating hierarchical task decompositions
+- Identifying dependencies between tasks
+- Estimating complexity and resource requirements
+- Orchestrating multi-agent workflows
+`,
+      judge: `
+You are a JUDGE AGENT specialized in:
+- Verifying the correctness of completed work
+- Evaluating code quality against criteria
+- Checking test coverage and completeness
+- Validating documentation accuracy
+- Deciding if work needs revision
+`,
+      synthesizer: `
+You are a SYNTHESIZER AGENT specialized in:
+- Combining results from multiple agents
+- Resolving conflicts between different approaches
+- Creating unified summaries and reports
+- Integrating partial solutions into complete ones
+- Providing holistic project overviews
+`,
+      monitor: `
+You are a MONITOR AGENT specialized in:
+- Tracking progress of ongoing tasks
+- Detecting stalled or failing operations
+- Reporting system health and metrics
+- Alerting on anomalies and issues
+- Ensuring SLA compliance
 `
     };
 
@@ -644,7 +819,7 @@ You are a DEBUGGING AGENT specialized in:
    * Get mesh network status and statistics
    */
   getStatus() {
-    return {
+    const baseStatus = {
       meshId: this.meshId,
       activeAgents: this.activeAgents.size,
       completedTasks: this.completedTasks.size,
@@ -653,9 +828,42 @@ You are a DEBUGGING AGENT specialized in:
       maxConcurrency: this.maxConcurrentAgents,
       defaultTimeoutMs: this.defaultTimeoutMs,
       agentRoles: ['analysis', 'implementation', 'testing', 'documentation', 'debugging'] as AgentRole[],
+      extendedRoles: ['planner', 'judge', 'synthesizer', 'monitor'] as const,
       agents: Array.from(this.activeAgents.values()),
-      recentResults: Array.from(this.completedTasks.values()).slice(-5)
+      recentResults: Array.from(this.completedTasks.values()).slice(-5),
+      // Swarm integration info
+      swarmAvailable: this.isSwarmAvailable(),
+      swarmThreshold: this.swarmThreshold
     };
+
+    return baseStatus;
+  }
+
+  /**
+   * Get swarm session status (if connected).
+   */
+  getSwarmSessionStatus(sessionId: string): ReturnType<SwarmOrchestrator['getSessionStatus']> | null {
+    if (!this.swarmOrchestrator) {
+      return null;
+    }
+    return this.swarmOrchestrator.getSessionStatus(sessionId);
+  }
+
+  /**
+   * List all swarm sessions (if connected).
+   */
+  async listSwarmSessions(): Promise<string[]> {
+    if (!this.swarmOrchestrator) {
+      return [];
+    }
+    return this.swarmOrchestrator.listSessions();
+  }
+
+  /**
+   * Get the mesh ID
+   */
+  getMeshId(): string {
+    return this.meshId;
   }
 }
 

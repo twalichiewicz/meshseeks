@@ -3,9 +3,10 @@
  * MeshSeeks Real-Time Status Board - stderr version for Claude Code
  *
  * Outputs status updates to stderr so they appear in Claude Code terminal
+ * Enhanced for swarm-scale operations (100+ agents, hierarchical tasks)
  *
  * @author Claude Code
- * @version 1.1.0
+ * @version 2.0.0
  */
 import { performance } from 'perf_hooks';
 class MeshStatusBoard {
@@ -16,12 +17,135 @@ class MeshStatusBoard {
     isDisplayActive = false;
     lastDisplayUpdate = 0;
     lastFullDisplay = 0;
+    // Swarm-scale tracking
+    swarmSessions = new Map();
+    hierarchicalTasks = new Map();
+    recentJudgeVerdicts = [];
+    checkpointHistory = [];
+    isSwarmMode = false;
+    // Role emoji mapping including extended roles
+    roleEmojis = {
+        analysis: '🔍',
+        implementation: '⚙️',
+        testing: '🧪',
+        documentation: '📝',
+        debugging: '🐛',
+        planner: '🗂️',
+        judge: '⚖️',
+        synthesizer: '🔀',
+        monitor: '📡'
+    };
     constructor() {
         // Initialize with emoji indicators for better visual feedback
         console.error('\n🟦 MeshSeeks Status Board Initialized (stderr output)\n');
         this.startStatusDisplay();
     }
-    // Agent Management
+    // ===========================================================================
+    // SWARM SESSION MANAGEMENT
+    // ===========================================================================
+    /**
+     * Enable swarm mode for large-scale visualization.
+     */
+    enableSwarmMode() {
+        this.isSwarmMode = true;
+        this.logEvent('🐝 Swarm mode enabled - scaling for 100+ agents');
+    }
+    /**
+     * Register a swarm session.
+     */
+    registerSwarmSession(session) {
+        this.swarmSessions.set(session.id, session);
+        this.logEvent(`🐝 Swarm session started: ${session.name} (${session.id})`);
+        if (!this.isSwarmMode) {
+            this.enableSwarmMode();
+        }
+    }
+    /**
+     * Update swarm session status.
+     */
+    updateSwarmSession(sessionId, updates) {
+        const session = this.swarmSessions.get(sessionId);
+        if (session) {
+            Object.assign(session, updates);
+            // Log significant status changes
+            if (updates.status === 'completed') {
+                this.logEvent(`✅ Swarm session completed: ${session.name}`);
+            }
+            else if (updates.status === 'paused') {
+                this.logEvent(`⏸️  Swarm session paused: ${session.name}`);
+            }
+            else if (updates.status === 'failed') {
+                this.logEvent(`❌ Swarm session failed: ${session.name}`);
+            }
+        }
+    }
+    /**
+     * Record a checkpoint.
+     */
+    recordCheckpoint(checkpointId, sessionId) {
+        this.checkpointHistory.push({
+            id: checkpointId,
+            sessionId,
+            time: Date.now()
+        });
+        // Keep only last 20 checkpoints
+        if (this.checkpointHistory.length > 20) {
+            this.checkpointHistory = this.checkpointHistory.slice(-20);
+        }
+        // Update session's last checkpoint
+        const session = this.swarmSessions.get(sessionId);
+        if (session) {
+            session.lastCheckpoint = checkpointId;
+        }
+        this.logEvent(`💾 Checkpoint created: ${checkpointId.substring(0, 8)}...`);
+    }
+    /**
+     * Record a judge verdict.
+     */
+    recordJudgeVerdict(taskId, verdict, confidence) {
+        this.recentJudgeVerdicts.push({
+            taskId,
+            verdict,
+            confidence,
+            time: Date.now()
+        });
+        // Keep only last 20 verdicts
+        if (this.recentJudgeVerdicts.length > 20) {
+            this.recentJudgeVerdicts = this.recentJudgeVerdicts.slice(-20);
+        }
+        const icon = verdict ? '✅' : '🔄';
+        this.logEvent(`⚖️  Judge verdict for ${taskId}: ${icon} (${(confidence * 100).toFixed(0)}% confidence)`);
+    }
+    // ===========================================================================
+    // HIERARCHICAL TASK TRACKING
+    // ===========================================================================
+    /**
+     * Register a hierarchical task relationship.
+     */
+    registerHierarchicalTask(taskId, parentId, depth) {
+        this.hierarchicalTasks.set(taskId, {
+            parentId,
+            depth,
+            children: []
+        });
+        // Update parent's children list
+        if (parentId) {
+            const parent = this.hierarchicalTasks.get(parentId);
+            if (parent) {
+                parent.children.push(taskId);
+            }
+        }
+    }
+    /**
+     * Get task depth for display.
+     */
+    getTaskDepth(taskId) {
+        const taskInfo = this.hierarchicalTasks.get(taskId);
+        return taskInfo?.depth ?? 0;
+    }
+    // ===========================================================================
+    // AGENT MANAGEMENT
+    // ===========================================================================
     registerAgent(id, role) {
         this.agents.set(id, {
             id,
@@ -29,7 +153,8 @@ class MeshStatusBoard {
             status: 'idle',
             lastUpdate: Date.now()
         });
-        this.logEvent(`🤖 Agent ${id} (${role}) registered`);
+        const emoji = this.roleEmojis[role] || '🤖';
+        this.logEvent(`${emoji} Agent ${id.substring(0, 8)}... (${role}) registered`);
     }
     updateAgentStatus(id, status, currentTask, progress) {
         const agent = this.agents.get(id);
@@ -111,6 +236,14 @@ class MeshStatusBoard {
     }
     displayFullStatus() {
         const metrics = this.calculateMetrics();
+        if (this.isSwarmMode) {
+            this.displaySwarmStatus(metrics);
+        }
+        else {
+            this.displayStandardStatus(metrics);
+        }
+    }
+    displayStandardStatus(metrics) {
         console.error('\n=== 🟦 MeshSeeks Network Status ===');
         console.error(`⏱️  Uptime: ${this.formatDuration(metrics.uptime)}`);
         console.error(`🤖 Active Agents: ${metrics.activeAgents}/${this.agents.size}`);
@@ -127,7 +260,8 @@ class MeshStatusBoard {
             console.error('\n🤖 Active Agents:');
             for (const agent of activeAgents.slice(0, 3)) {
                 const task = agent.currentTask || 'No task';
-                console.error(`  ⚡ ${agent.id} (${agent.role}): ${task}`);
+                const emoji = this.roleEmojis[agent.role] || '🤖';
+                console.error(`  ${emoji} ${agent.id.substring(0, 8)}... (${agent.role}): ${task}`);
             }
             if (activeAgents.length > 3) {
                 console.error(`  ... and ${activeAgents.length - 3} more agents working`);
@@ -147,6 +281,76 @@ class MeshStatusBoard {
         }
         console.error('================================\n');
     }
+    displaySwarmStatus(metrics) {
+        console.error('\n╔════════════════════════════════════════════════════════════════╗');
+        console.error('║           🐝 MESHSEEKS SWARM STATUS BOARD 🐝                   ║');
+        console.error('╠════════════════════════════════════════════════════════════════╣');
+        // Overall metrics row
+        console.error(`║ ⏱️  Uptime: ${this.formatDuration(metrics.uptime).padEnd(12)} │ 🤖 Agents: ${String(metrics.activeAgents).padStart(3)}/${String(this.agents.size).padStart(3)}         ║`);
+        console.error(`║ 📊 Tasks: ${String(metrics.completedTasks).padStart(4)}/${String(metrics.totalTasks).padStart(4)}      │ ⚡ ${metrics.throughput.toFixed(1).padStart(6)} tasks/min      ║`);
+        // Progress bar
+        if (metrics.totalTasks > 0) {
+            const percentage = (metrics.completedTasks / metrics.totalTasks) * 100;
+            const progressBar = this.createSimpleProgressBar(metrics.completedTasks / metrics.totalTasks, 40);
+            console.error(`║ ${progressBar} ${percentage.toFixed(1).padStart(5)}% ║`);
+        }
+        // Swarm sessions
+        const activeSessions = Array.from(this.swarmSessions.values()).filter(s => s.status === 'active');
+        if (activeSessions.length > 0) {
+            console.error('╠────────────────────────────────────────────────────────────────╣');
+            console.error('║ 🐝 ACTIVE SWARM SESSIONS                                       ║');
+            for (const session of activeSessions.slice(0, 3)) {
+                const sessionProgress = session.totalTasks > 0
+                    ? ((session.completedTasks / session.totalTasks) * 100).toFixed(0)
+                    : '0';
+                const depthIndicator = `D${session.currentDepth}/${session.maxDepth}`;
+                const name = session.name.substring(0, 20).padEnd(20);
+                console.error(`║   📦 ${name} ${sessionProgress.padStart(3)}% │ ${depthIndicator} │ 🤖 ${session.activeAgents}  ║`);
+            }
+            if (activeSessions.length > 3) {
+                console.error(`║   ... and ${activeSessions.length - 3} more active sessions                          ║`);
+            }
+        }
+        // Agent distribution by role
+        const agentsByRole = this.getAgentDistribution();
+        if (Object.keys(agentsByRole).length > 0) {
+            console.error('╠────────────────────────────────────────────────────────────────╣');
+            console.error('║ 🤖 AGENT DISTRIBUTION BY ROLE                                  ║');
+            const roleEntries = Object.entries(agentsByRole);
+            const row1 = roleEntries.slice(0, 5).map(([role, count]) => `${this.roleEmojis[role] || '🤖'}${count}`).join(' ');
+            const row2 = roleEntries.slice(5, 10).map(([role, count]) => `${this.roleEmojis[role] || '🤖'}${count}`).join(' ');
+            console.error(`║   ${row1.padEnd(60)} ║`);
+            if (row2) {
+                console.error(`║   ${row2.padEnd(60)} ║`);
+            }
+        }
+        // Recent judge verdicts
+        if (this.recentJudgeVerdicts.length > 0) {
+            console.error('╠────────────────────────────────────────────────────────────────╣');
+            console.error('║ ⚖️  RECENT JUDGE VERDICTS                                       ║');
+            const recentVerdicts = this.recentJudgeVerdicts.slice(-3);
+            const passCount = recentVerdicts.filter(v => v.verdict).length;
+            const avgConfidence = recentVerdicts.reduce((sum, v) => sum + v.confidence, 0) / recentVerdicts.length;
+            console.error(`║   Pass rate: ${passCount}/${recentVerdicts.length} │ Avg confidence: ${(avgConfidence * 100).toFixed(0)}%             ║`);
+        }
+        // Recent checkpoints
+        if (this.checkpointHistory.length > 0) {
+            const recentCheckpoint = this.checkpointHistory[this.checkpointHistory.length - 1];
+            const timeSince = this.formatDuration(Date.now() - recentCheckpoint.time);
+            console.error('╠────────────────────────────────────────────────────────────────╣');
+            console.error(`║ 💾 Last checkpoint: ${timeSince} ago                                ║`);
+        }
+        console.error('╚════════════════════════════════════════════════════════════════╝\n');
+    }
+    getAgentDistribution() {
+        const distribution = {};
+        for (const agent of this.agents.values()) {
+            if (agent.status === 'working') {
+                distribution[agent.role] = (distribution[agent.role] || 0) + 1;
+            }
+        }
+        return distribution;
+    }
     displayQuickStatus() {
         const metrics = this.calculateMetrics();
         const activeAgents = Array.from(this.agents.values()).filter(a => a.status === 'working');
@@ -154,9 +358,22 @@ class MeshStatusBoard {
         const progress = metrics.totalTasks > 0
             ? `${((metrics.completedTasks / metrics.totalTasks) * 100).toFixed(0)}%`
             : '0%';
-        console.error(`🟦 Mesh: ${activeAgents.length} agents working | ` +
-            `Tasks: ${metrics.completedTasks}/${metrics.totalTasks} (${progress}) | ` +
-            `${metrics.throughput.toFixed(1)}/min`);
+        if (this.isSwarmMode) {
+            // Swarm mode: more compact display for high-agent scenarios
+            const activeSessions = this.swarmSessions.size;
+            const judgePassRate = this.recentJudgeVerdicts.length > 0
+                ? `${Math.round((this.recentJudgeVerdicts.filter(v => v.verdict).length / this.recentJudgeVerdicts.length) * 100)}%`
+                : '-';
+            console.error(`🐝 Swarm: ${activeAgents.length}🤖 | ` +
+                `${metrics.completedTasks}/${metrics.totalTasks} (${progress}) | ` +
+                `⚖️ ${judgePassRate} | ` +
+                `📦 ${activeSessions} sessions`);
+        }
+        else {
+            console.error(`🟦 Mesh: ${activeAgents.length} agents working | ` +
+                `Tasks: ${metrics.completedTasks}/${metrics.totalTasks} (${progress}) | ` +
+                `${metrics.throughput.toFixed(1)}/min`);
+        }
     }
     calculateMetrics() {
         const now = performance.now();
@@ -249,7 +466,7 @@ class MeshStatusBoard {
     }
     // Get current status for external queries
     getStatus() {
-        return {
+        const baseStatus = {
             agents: Array.from(this.agents.values()),
             tasks: Array.from(this.tasks.values()),
             metrics: this.calculateMetrics(),
@@ -257,6 +474,40 @@ class MeshStatusBoard {
                 time: new Date(e.timestamp).toLocaleTimeString(),
                 message: e.message
             }))
+        };
+        if (this.isSwarmMode) {
+            return {
+                ...baseStatus,
+                isSwarmMode: true,
+                swarmSessions: Array.from(this.swarmSessions.values()),
+                hierarchicalTaskCount: this.hierarchicalTasks.size,
+                recentJudgeVerdicts: this.recentJudgeVerdicts.slice(-5),
+                recentCheckpoints: this.checkpointHistory.slice(-5),
+                agentDistribution: this.getAgentDistribution()
+            };
+        }
+        return baseStatus;
+    }
+    /**
+     * Get swarm-specific metrics.
+     */
+    getSwarmMetrics() {
+        const agents = Array.from(this.agents.values());
+        const activeAgents = agents.filter(a => a.status === 'working').length;
+        const judgePassRate = this.recentJudgeVerdicts.length > 0
+            ? this.recentJudgeVerdicts.filter(v => v.verdict).length / this.recentJudgeVerdicts.length
+            : 0;
+        const depths = Array.from(this.hierarchicalTasks.values()).map(t => t.depth);
+        const avgTaskDepth = depths.length > 0
+            ? depths.reduce((sum, d) => sum + d, 0) / depths.length
+            : 0;
+        return {
+            activeSessions: Array.from(this.swarmSessions.values()).filter(s => s.status === 'active').length,
+            totalAgents: agents.length,
+            activeAgents,
+            judgePassRate,
+            avgTaskDepth,
+            checkpointCount: this.checkpointHistory.length
         };
     }
     // Batch updates for efficiency

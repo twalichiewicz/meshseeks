@@ -465,7 +465,7 @@ class ClaudeCodeServer {
                             status: 'error',
                             error: 'Markdown format validation failed',
                             details: stderr,
-                            helpUrl: 'https://github.com/grahama1970/claude-code-mcp/blob/main/README.md#markdown-task-file-format'
+                            helpUrl: 'https://github.com/twalichiewicz/meshseeks/blob/main/README.md#markdown-task-file-format'
                         };
                         this.activeRequests.delete(requestId);
                         return { content: [{ type: 'text', text: JSON.stringify(validationError, null, 2) }] };
@@ -496,7 +496,7 @@ class ClaudeCodeServer {
                             status: 'error',
                             error: 'Task conversion failed',
                             details: stderr || errorMessage,
-                            helpUrl: 'https://github.com/grahama1970/claude-code-mcp/blob/main/README.md#markdown-task-file-format'
+                            helpUrl: 'https://github.com/twalichiewicz/meshseeks/blob/main/README.md#markdown-task-file-format'
                         };
                         return { content: [{ type: 'text', text: JSON.stringify(validationError, null, 2) }] };
                     }

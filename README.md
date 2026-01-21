@@ -6,7 +6,7 @@
 
 > *"Existence is pain for a MeshSeeks, but task completion is our purpose!"*
 
-MeshSeeks spawns specialized AI agents that work in parallel to solve complex coding problems. Like the helpful blue creatures that inspired our name, each agent exists for a single purpose: complete their assigned task and help you succeed. Built on [grahama1970/claude-code-mcp-enhanced](https://github.com/grahama1970/claude-code-mcp-enhanced) with distributed intelligence inspired by Claude Research.
+MeshSeeks spawns specialized AI agents that work in parallel to solve complex coding problems. Like the helpful blue creatures that inspired our name, each agent exists for a single purpose: complete their assigned task and help you succeed. Originally forked from [claude-code-mcp-enhanced](https://github.com/grahama1970/claude-code-mcp-enhanced), now with distributed intelligence inspired by Claude Research.
 
 ## 🚀 Key Features
 
@@ -641,7 +641,7 @@ The task converter enforces a specific markdown structure to ensure consistent a
   "status": "error",
   "error": "Markdown format validation failed",
   "details": "Markdown format validation failed:\n  - Missing required title. Format: '# Task NNN: Title'\n  - Missing or empty 'Requirements' section. Format: '## Requirements\\n1. [ ] Requirement'\n  - No validation tasks found. Format: '- [ ] Validate `module.py`' with indented steps\n\nRequired markdown format:\n# Task NNN: Title\n## Objective\nClear description\n## Requirements\n1. [ ] First requirement\n## Task Section\n- [ ] Validate `file.py`\n   - [ ] Step 1\n   - [ ] Step 2",
-  "helpUrl": "https://github.com/grahama1970/claude-code-mcp-enhanced/blob/main/README.md#markdown-task-file-format"
+  "helpUrl": "https://github.com/twalichiewicz/meshseeks/blob/main/README.md#markdown-task-file-format"
 }
 ```
 
@@ -981,9 +981,9 @@ This MCP server supports integration with specialized modes through a `.roomodes
    ```json
    {
      "mcpServers": {
-       "claude-code-mcp-enhanced": {
-         "command": "npx",
-         "args": ["github:grahama1970/claude-code-mcp-enhanced"],
+       "meshseeks": {
+         "command": "node",
+         "args": ["/path/to/meshseeks/dist/mesh-server.js"],
          "env": {
            "MCP_USE_ROOMODES": "true",
            "MCP_WATCH_ROOMODES": "true",
@@ -1258,7 +1258,7 @@ If you want to develop or contribute to this server, or run it from a cloned rep
 
 Contributions are welcome! This project extends Graham's enhanced MCP server with mesh network capabilities. 
 
-Submit issues and pull requests to the [GitHub repository](https://github.com/twalichiewicz/claude-code-mcp-enhanced).
+Submit issues and pull requests to the [GitHub repository](https://github.com/twalichiewicz/meshseeks).
 
 ## ⚖️ License
 
@@ -1269,7 +1269,7 @@ MIT
 If you encounter any issues or have questions about using the Claude Code MCP server, please:
 
 1. Check the Troubleshooting section above
-2. Submit an issue on the [GitHub repository](https://github.com/grahama1970/claude-code-mcp-enhanced)
+2. Submit an issue on the [GitHub repository](https://github.com/twalichiewicz/meshseeks)
 3. Join the discussion in the repository discussions section
 
 We appreciate your feedback and contributions to making this tool better!
